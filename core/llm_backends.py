@@ -6,8 +6,26 @@ All three support reliable function calling / tool use.
 from __future__ import annotations
 import json
 import os
+import re
 from abc import ABC, abstractmethod
 from typing import Any
+
+
+def _extract_text_tool_calls(text: str) -> list[dict]:
+    """Fallback: parse tool calls that a model printed as JSON text instead of using native calling."""
+    calls = []
+    # Match {"name": "...", "arguments": {...}} or {"name": "...", "input": {...}}
+    pattern = r'\{[\s\S]*?"name"\s*:\s*"([^"]+)"[\s\S]*?\}'
+    for m in re.finditer(pattern, text):
+        try:
+            obj = json.loads(m.group(0))
+            name = obj.get("name")
+            inp  = obj.get("arguments") or obj.get("input") or obj.get("parameters") or {}
+            if name and isinstance(inp, dict):
+                calls.append({"id": f"text_{len(calls)}", "name": name, "input": inp})
+        except Exception:
+            continue
+    return calls
 
 PROVIDER_DEFAULTS = {
     "claude": {
@@ -153,11 +171,13 @@ class OpenAICompatBackend(LLMBackend):
             kwargs["tools"] = oai_tools
         response = self._client.chat.completions.create(**kwargs)
         tc_acc: dict[int, dict] = {}
+        text_chunks: list[str] = []
         finish_reason = "stop"
         for chunk in response:
             choice = chunk.choices[0]
             finish_reason = choice.finish_reason or finish_reason
             if choice.delta.content:
+                text_chunks.append(choice.delta.content)
                 yield ("text", choice.delta.content)
             if choice.delta.tool_calls:
                 for tc in choice.delta.tool_calls:
@@ -173,6 +193,14 @@ class OpenAICompatBackend(LLMBackend):
             try: inp = json.loads(tc["arguments"])
             except Exception: inp = {}
             tool_calls.append({"id": tc["id"], "name": tc["name"], "input": inp})
+
+        # Fallback: model printed tool calls as text instead of using native calling
+        if not tool_calls and text_chunks:
+            full_text = "".join(text_chunks)
+            tool_calls = _extract_text_tool_calls(full_text)
+            if tool_calls:
+                finish_reason = "tool_calls"
+
         yield ("tool_calls", tool_calls)
         yield ("stop_reason", "tool_calls" if finish_reason == "tool_calls" else "end_turn")
 
@@ -194,7 +222,12 @@ class OpenAICompatBackend(LLMBackend):
                 except Exception:
                     inp = {}
                 tool_calls.append({"id": tc.id, "name": tc.function.name, "input": inp})
-        return text, tool_calls, choice.finish_reason == "tool_calls"
+
+        # Fallback: model printed tool calls as text instead of using native calling
+        if not tool_calls and text:
+            tool_calls = _extract_text_tool_calls(text)
+
+        return text, tool_calls, choice.finish_reason == "tool_calls" or bool(tool_calls)
 
     def make_assistant_message(self, text, tool_calls):
         msg: dict[str, Any] = {"role": "assistant", "content": text or ""}
