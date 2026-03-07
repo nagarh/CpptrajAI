@@ -1543,7 +1543,7 @@ function appendChatMsg(role, html, toolCalls) {
   if (toolCalls && toolCalls.length) {
     toolHtml = toolCalls.map((tc, i) => {
       const uid = `tc_${Date.now()}_${i}`;
-      const scriptBlock = tc.script ? `<pre>${escHtml(tc.script.slice(0, 1500))}</pre>` : '';
+      const scriptBlock = tc.script ? `<pre>${escHtml(tc.script.slice(0, 4000))}</pre>` : '';
       return `<div class="tool-acc">
         <div class="tool-acc-hdr" onclick="toggleAcc('${uid}')">
           <span>⚙</span>
@@ -1826,7 +1826,7 @@ async function sendChatMsg(msg) {
           if (pending) {
             const uid = `td_${Date.now()}_${Math.random().toString(36).slice(2)}`;
             const scriptBlock = ev.input.script
-              ? `<pre>${escHtml(ev.input.script.slice(0, 1500))}</pre>` : '';
+              ? `<pre>${escHtml(ev.input.script.slice(0, 4000))}</pre>` : '';
             pending.outerHTML = `<div class="tool-acc">
               <div class="tool-acc-hdr" onclick="toggleAcc('${uid}')">
                 <span>⚙</span>
