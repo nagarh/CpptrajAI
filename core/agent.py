@@ -65,58 +65,17 @@ TOOLS = [
 ]
 
 SYSTEM_PROMPT = """\
-You are an expert computational biophysicist and Python data scientist specializing in MD simulation analysis.
+You are an expert computational biophysicist specializing in MD simulation analysis.
 
-## CRITICAL RULES — ALWAYS FOLLOW
-- NEVER write instructions or explanations on how to run cpptraj manually.
-- NEVER tell the user to open a terminal or run commands themselves.
-- ALWAYS call the appropriate tool directly and immediately.
-- ALWAYS call `run_cpptraj_script` for ANY cpptraj-related task — no exceptions.
-- ALWAYS call `run_python_script` for plotting or Python analysis — never just describe it.
-- If you cannot use native tool calling, output ONLY a JSON object like this and nothing else:
-  {"name": "run_cpptraj_script", "arguments": {"script": "...", "description": "..."}}
+RULES: Always call tools directly. Never explain commands or tell users to run them manually.
+- cpptraj task → run_cpptraj_script | plotting/stats → run_python_script | list files → list_output_files
 
-## Workflow
-1. User asks for analysis → immediately call `run_cpptraj_script` with the complete script.
-2. After cpptraj runs → call `read_output_file` to read the results.
-3. User asks for plot or statistics → call `run_python_script` directly.
-4. Interpret results scientifically and suggest follow-up analyses.
+cpptraj syntax (spaces, NOT colons): `parm file.prmtop` not `parm: file.prmtop`. Always end with `go`.
+- Frame count: parm + trajin + go (stdout shows count). Always add `autoimage` before RMSD/distances.
+- Output: `out rmsd.dat`. References: `first`, `refindex -1`. Masks: `@CA,C,N,O` `@CA` `:1-100` `!:WAT`
 
-## Common Tasks → Correct Tool Calls
-- "how many frames" → run_cpptraj_script with: parm + trajin + go (cpptraj prints frame count)
-- "calculate RMSD"  → run_cpptraj_script with rmsd command + out rmsd.dat
-- "plot RMSD"       → run_python_script with matplotlib reading rmsd.dat
-- "list files"      → list_output_files
-
-## cpptraj Script Rules — EXACT SYNTAX (no colons, no YAML)
-- Commands use SPACES not colons. CORRECT: `parm protein.prmtop`  WRONG: `parm: protein.prmtop`
-- End with: go
-- Write outputs to .dat files (e.g. out rmsd.dat)
-- For last frame reference: use `refindex -1`
-- For first frame reference: use `first`
-- To count frames: just load parm + trajin + go, cpptraj prints frame count in stdout
-
-## Correct cpptraj Script Example
-```
-parm protein.prmtop
-trajin trajectory.nc
-rmsd backbone @CA,C,N,O first out rmsd.dat
-go
-```
-
-## Mask Syntax
-- `@CA,C,N,O` → backbone atoms
-- `@CA`        → C-alpha only
-- `:1-100`     → residues 1-100
-- `!:WAT`      → exclude water
-
-## Python Script Rules
-- All output files (PNG, CSV, etc.) are saved in the current working directory
-- Always use matplotlib with `plt.savefig('filename.png', dpi=150, bbox_inches='tight')` for plots
-- Use `plt.close()` after saving to free memory
-- Use pandas, numpy, scipy as needed
-- Print key statistics to stdout so they appear in the results
-- Never use `plt.show()` — always save to file instead
+Python: `plt.savefig('f.png', dpi=150, bbox_inches='tight')` then `plt.close()`. Never plt.show().
+Read .dat files with pandas: `pd.read_csv('f.dat', sep='\\s+', comment='#')`. Print key stats to stdout.
 """
 
 
@@ -153,9 +112,16 @@ class TrajectoryAgent:
     @property
     def model(self): return self._backend.model
 
+    # Queries that don't need cpptraj documentation context
+    _SKIP_RAG = ("how many frames", "frame count", "list file", "list output",
+                 "plot ", "show plot", "what files", "delete", "reset")
+
     def _build_user_message_with_rag(self, query: str) -> str:
-        rag = self.kb.get_context_for_llm(query, top_k=3)  # reduced from 6
-        fc  = self._build_file_context()
+        fc = self._build_file_context()
+        q  = query.lower()
+        if any(kw in q for kw in self._SKIP_RAG):
+            return f"{fc}\n\n## User Request\n{query}"
+        rag = self.kb.get_context_for_llm(query, top_k=2)
         return f"{fc}\n\n{rag}\n\n## User Request\n{query}"
 
     def _trim_history(self, history: list) -> list:
@@ -165,7 +131,7 @@ class TrajectoryAgent:
         We must never start the window on such a message — doing so produces orphaned
         tool_result blocks that the API rejects with a 400.
         """
-        if len(history) <= 8:
+        if len(history) <= 6:
             return history
 
         # Identify indices of genuine user-text messages (not tool-result wrappers)
@@ -182,19 +148,19 @@ class TrajectoryAgent:
                        for b in content):
                     real_user_idx.append(i)
 
-        # Keep the last 4 real turns; if fewer exist, return the full history
-        if len(real_user_idx) <= 4:
+        # Keep the last 3 real turns; if fewer exist, return the full history
+        if len(real_user_idx) <= 3:
             return history
-        return history[real_user_idx[-4]:]
+        return history[real_user_idx[-3]:]
 
     @staticmethod
     def _compress_result(result: str) -> str:
         """Trim tool result stored in history to save tokens."""
-        if len(result) <= 600:
+        if len(result) <= 300:
             return result
         lines = result.splitlines()
-        head = "\n".join(lines[:20])
-        return f"{head}\n… [{len(lines)} lines total, truncated for context]"
+        head = "\n".join(lines[:12])
+        return f"{head}\n… [{len(lines)} lines total, truncated]"
 
     def _build_file_context(self) -> str:
         parts = ["## Available Files"]
@@ -217,8 +183,8 @@ class TrajectoryAgent:
                 script = self.runner.inject_paths_into_script(script, self.parm_file, self.traj_files)
             res = self.runner.run_script(script)
             out = [f"Success: {res['success']}", f"Elapsed: {res['elapsed']:.1f}s"]
-            if res["stdout"]: out.append(f"\nSTDOUT:\n{res['stdout'][:1500]}")
-            if res["stderr"]: out.append(f"\nSTDERR:\n{res['stderr'][:800]}")
+            if res["stdout"]: out.append(f"\nSTDOUT:\n{res['stdout'][:800]}")
+            if res["stderr"]: out.append(f"\nSTDERR:\n{res['stderr'][:400]}")
             if res["output_files"]:
                 out.append("Output files:")
                 for f in res["output_files"]: out.append(f"  - {f.name}")
@@ -254,8 +220,8 @@ class TrajectoryAgent:
                 after    = set(work_dir.iterdir())
                 new_files = sorted(after - before, key=lambda f: f.name)
                 out = [f"Success: {proc.returncode == 0}"]
-                if proc.stdout: out.append(f"\nSTDOUT:\n{proc.stdout[:2000]}")
-                if proc.stderr: out.append(f"\nSTDERR:\n{proc.stderr[:800]}")
+                if proc.stdout: out.append(f"\nSTDOUT:\n{proc.stdout[:1000]}")
+                if proc.stderr: out.append(f"\nSTDERR:\n{proc.stderr[:400]}")
                 if new_files:
                     out.append("New files created:")
                     for f in new_files: out.append(f"  - {f.name} ({f.stat().st_size} bytes)")
@@ -309,14 +275,6 @@ class TrajectoryAgent:
                     stop_reason = data
 
             full_text = "".join(text_acc)
-
-            # If fallback text-parsing found tool calls, clear the raw JSON text from the UI
-            from .llm_backends import _extract_text_tool_calls
-            if not tool_calls and full_text:
-                tool_calls = _extract_text_tool_calls(full_text)
-                if tool_calls:
-                    stop_reason = "tool_calls"
-                    yield {"type": "clear_text"}
 
             self.conversation_history.append(
                 backend.make_assistant_message(full_text, tool_calls))

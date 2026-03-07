@@ -37,13 +37,13 @@ PROVIDER_DEFAULTS = {
         "base_url": "https://api.openai.com/v1",
         "default_model": "gpt-4o-mini",
         "label": "OpenAI",
-        "models": ["gpt-4o-mini", "gpt-4o", "gpt-4-turbo"],
+        "models": ["gpt-4o-mini", "gpt-4o"],
     },
     "gemini": {
         "base_url": "https://generativelanguage.googleapis.com/v1beta/openai/",
         "default_model": "gemini-2.0-flash",
         "label": "Google Gemini",
-        "models": ["gemini-2.0-flash", "gemini-1.5-flash", "gemini-1.5-pro"],
+        "models": ["gemini-2.0-flash", "gemini-1.5-flash"],
     },
 }
 
@@ -86,7 +86,7 @@ class ClaudeBackend(LLMBackend):
 
     def chat(self, messages, tools, system):
         response = self._client.messages.create(
-            model=self._model, max_tokens=4096,
+            model=self._model, max_tokens=2048,
             system=system, tools=self._claude_tools(tools), messages=messages,
         )
         text_parts, tool_calls = [], []
@@ -111,7 +111,7 @@ class ClaudeBackend(LLMBackend):
     def stream_chat(self, messages, tools, system):
         claude_tools = self._claude_tools(tools)
         with self._client.messages.stream(
-            model=self._model, max_tokens=4096,
+            model=self._model, max_tokens=2048,
             system=system, tools=claude_tools, messages=messages,
         ) as stream:
             for text in stream.text_stream:
@@ -166,7 +166,7 @@ class OpenAICompatBackend(LLMBackend):
     def stream_chat(self, messages, tools, system):
         oai_tools = self._oai_tools(tools)
         full_messages = [{"role": "system", "content": system}] + messages
-        kwargs: dict[str, Any] = dict(model=self._model, messages=full_messages, max_tokens=4096, stream=True)
+        kwargs: dict[str, Any] = dict(model=self._model, messages=full_messages, max_tokens=2048, stream=True)
         if oai_tools:
             kwargs["tools"] = oai_tools
         response = self._client.chat.completions.create(**kwargs)
@@ -200,7 +200,7 @@ class OpenAICompatBackend(LLMBackend):
     def chat(self, messages, tools, system):
         oai_tools = self._oai_tools(tools)
         full_messages = [{"role": "system", "content": system}] + messages
-        kwargs: dict[str, Any] = dict(model=self._model, messages=full_messages, max_tokens=4096)
+        kwargs: dict[str, Any] = dict(model=self._model, messages=full_messages, max_tokens=2048)
         if oai_tools:
             kwargs["tools"] = oai_tools
         response = self._client.chat.completions.create(**kwargs)
@@ -239,120 +239,12 @@ class OpenAICompatBackend(LLMBackend):
         ]}
 
 
-REACT_SYSTEM_SUFFIX = """
-
-## HOW TO CALL TOOLS
-You do NOT have access to native function calling. Instead, when you need to use a tool,
-output a line in this EXACT format — nothing before or after the ACTION line:
-
-ACTION: {"name": "TOOL_NAME", "arguments": {KEY: VALUE}}
-
-Available tools:
-- run_cpptraj_script  → arguments: {"script": "<full cpptraj script>", "description": "<what it does>"}
-- run_python_script   → arguments: {"script": "<full python script>", "description": "<what it does>"}
-- read_output_file    → arguments: {"filename": "<filename.dat>"}
-- list_output_files   → arguments: {}
-
-RULES:
-- Output ONLY the ACTION line when calling a tool — no other text on that line
-- Wait for the RESULT before continuing
-- After seeing RESULT, interpret it and respond to the user
-
-EXAMPLE:
-User: how many frames in my trajectory?
-ACTION: {"name": "run_cpptraj_script", "arguments": {"script": "parm protein.prmtop\\ntrajin traj.nc\\ngo", "description": "Count frames"}}
-RESULT: Success: True\\nSTDOUT: ... 500 frames ...
-Answer: Your trajectory has 500 frames.
-"""
-
-
-class OllamaReActBackend(LLMBackend):
-    """ReAct-style backend for Ollama — no native tool calling, parses ACTION: lines instead."""
-
-    def __init__(self, model: str, base_url: str):
-        from openai import OpenAI
-        self._model = model
-        self._client = OpenAI(api_key="ollama", base_url=base_url)
-
-    @property
-    def provider(self): return "ollama"
-    @property
-    def model(self): return self._model
-
-    def _parse_action(self, text: str) -> list[dict]:
-        """Extract ACTION: {...} lines from model output."""
-        calls = []
-        for line in text.splitlines():
-            line = line.strip()
-            if not line.upper().startswith("ACTION:"):
-                continue
-            raw = line[line.index(":")+1:].strip()
-            try:
-                obj  = json.loads(raw)
-                name = obj.get("name", "")
-                inp  = obj.get("arguments") or obj.get("input") or {}
-                if name:
-                    calls.append({"id": f"react_{len(calls)}", "name": name, "input": inp})
-            except Exception:
-                # Try fallback generic JSON extraction
-                extracted = _extract_text_tool_calls(raw)
-                calls.extend(extracted)
-        return calls
-
-    def stream_chat(self, messages, tools, system):
-        full_system = system + REACT_SYSTEM_SUFFIX
-        full_messages = [{"role": "system", "content": full_system}] + messages
-        response = self._client.chat.completions.create(
-            model=self._model, messages=full_messages, max_tokens=4096, stream=True
-        )
-        text_chunks = []
-        for chunk in response:
-            choice = chunk.choices[0]
-            if choice.delta.content:
-                text_chunks.append(choice.delta.content)
-                yield ("text", choice.delta.content)
-
-        full_text = "".join(text_chunks)
-        tool_calls = self._parse_action(full_text)
-        yield ("tool_calls", tool_calls)
-        yield ("stop_reason", "tool_calls" if tool_calls else "end_turn")
-
-    def chat(self, messages, tools, system):
-        full_system = system + REACT_SYSTEM_SUFFIX
-        full_messages = [{"role": "system", "content": full_system}] + messages
-        response = self._client.chat.completions.create(
-            model=self._model, messages=full_messages, max_tokens=4096
-        )
-        text = response.choices[0].message.content or ""
-        tool_calls = self._parse_action(text)
-        return text, tool_calls, bool(tool_calls)
-
-    def make_assistant_message(self, text, tool_calls):
-        # Inject RESULT markers so the model sees tool outputs in conversation
-        if tool_calls:
-            action_lines = "\n".join(
-                f'ACTION: {json.dumps({"name": tc["name"], "arguments": tc["input"]})}'
-                for tc in tool_calls
-            )
-            return {"role": "assistant", "content": action_lines}
-        return {"role": "assistant", "content": text}
-
-    def make_tool_result_message(self, tool_calls, results):
-        result_text = "\n".join(
-            f"RESULT for {tc['name']}:\n{r}" for tc, r in zip(tool_calls, results)
-        )
-        return {"role": "user", "content": result_text}
-
-
 def create_backend(provider: str, api_key: str = "", model: str = "", base_url: str = "") -> LLMBackend:
-    provider  = provider.lower().strip()
-    defaults  = PROVIDER_DEFAULTS.get(provider, PROVIDER_DEFAULTS["openai"])
-    model     = model    or defaults["default_model"]
-    base_url  = base_url or defaults.get("base_url", "")
-    api_key   = api_key
+    provider = provider.lower().strip()
+    defaults = PROVIDER_DEFAULTS.get(provider, PROVIDER_DEFAULTS["openai"])
+    model    = model    or defaults["default_model"]
+    base_url = base_url or defaults.get("base_url", "")
 
     if provider == "claude":
         return ClaudeBackend(api_key=api_key, model=model)
-    if provider == "ollama":
-        return OllamaReActBackend(model=model, base_url=base_url)
     return OpenAICompatBackend(api_key=api_key, model=model, base_url=base_url, provider_name=provider)
