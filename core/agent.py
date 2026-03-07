@@ -4,6 +4,8 @@ All three providers support reliable tool use / function calling.
 """
 
 import os
+import subprocess
+import sys
 from pathlib import Path
 
 from .knowledge_base import CPPTrajKnowledgeBase
@@ -43,17 +45,35 @@ TOOLS = [
         "description": "List all output files in the working directory.",
         "input_schema": {"type": "object", "properties": {}},
     },
+    {
+        "name": "run_python_script",
+        "description": (
+            "Write and execute a Python script for post-processing, plotting, or statistical "
+            "analysis of cpptraj output files. Use matplotlib to save plots as PNG. "
+            "All output files (PNG, CSV, etc.) are saved to the working directory. "
+            "Returns stdout, stderr, and any new files created."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "script":      {"type": "string", "description": "Complete Python script to execute"},
+                "description": {"type": "string", "description": "What this script does"},
+            },
+            "required": ["script", "description"],
+        },
+    },
 ]
 
 SYSTEM_PROMPT = """\
-You are an expert computational biophysicist specializing in MD simulation analysis with cpptraj.
+You are an expert computational biophysicist and Python data scientist specializing in MD simulation analysis.
 
 ## Workflow
-1. When the user asks for any analysis, call `run_cpptraj_script` with the complete script.
-2. After it runs, call `read_output_file` to read the results.
-3. Explain the results clearly in scientific terms and suggest follow-up analyses.
+1. For trajectory analysis: call `run_cpptraj_script` with the complete cpptraj script.
+2. After cpptraj runs: call `read_output_file` to read and interpret the results.
+3. For plotting, statistics, or further analysis of output data: call `run_python_script`.
+4. Explain results clearly in scientific terms and suggest follow-up analyses.
 
-## Script Rules
+## cpptraj Script Rules
 - Start with: parm <topology_file>
 - Add: trajin <trajectory_file>
 - End with: go
@@ -66,6 +86,14 @@ You are an expert computational biophysicist specializing in MD simulation analy
 - `@CA`        → C-alpha only
 - `:1-100`     → residues 1-100
 - `!:WAT`      → exclude water
+
+## Python Script Rules
+- All output files (PNG, CSV, etc.) are saved in the current working directory
+- Always use matplotlib with `plt.savefig('filename.png', dpi=150, bbox_inches='tight')` for plots
+- Use `plt.close()` after saving to free memory
+- Use pandas, numpy, scipy as needed
+- Print key statistics to stdout so they appear in the results
+- Never use `plt.show()` — always save to file instead
 """
 
 
@@ -189,6 +217,30 @@ class TrajectoryAgent:
             if not files: return "No output files yet."
             return "Output files:\n" + "\n".join(
                 f"  - {f.name} ({f.stat().st_size} bytes)" for f in files)
+
+        if name == "run_python_script":
+            script   = inp["script"]
+            work_dir = self.runner.work_dir
+            before   = set(work_dir.iterdir())
+            try:
+                proc = subprocess.run(
+                    [sys.executable, "-c", script],
+                    capture_output=True, text=True, timeout=60,
+                    cwd=str(work_dir),
+                )
+                after    = set(work_dir.iterdir())
+                new_files = sorted(after - before, key=lambda f: f.name)
+                out = [f"Success: {proc.returncode == 0}"]
+                if proc.stdout: out.append(f"\nSTDOUT:\n{proc.stdout[:2000]}")
+                if proc.stderr: out.append(f"\nSTDERR:\n{proc.stderr[:800]}")
+                if new_files:
+                    out.append("New files created:")
+                    for f in new_files: out.append(f"  - {f.name} ({f.stat().st_size} bytes)")
+                return "\n".join(out)
+            except subprocess.TimeoutExpired:
+                return "Error: Python script timed out after 60 seconds."
+            except Exception as e:
+                return f"Error running Python script: {e}"
 
         return f"Unknown tool: {name}"
 
