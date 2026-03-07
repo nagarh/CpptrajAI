@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>cpptraj IDE — Molecular Dynamics Analysis Studio</title>
+<title>CpptrajGPT — Molecular Dynamics Analysis Studio</title>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
 <script src="https://unpkg.com/ngl@2.0.0-dev.37/dist/ngl.js"></script>
 <style>
@@ -692,6 +692,7 @@
       <option value="claude">Anthropic Claude</option>
       <option value="openai">OpenAI (GPT)</option>
       <option value="gemini">Google Gemini</option>
+      <option value="ollama">Ollama (Local — Free)</option>
     </select>
 
     <label>Model</label>
@@ -713,7 +714,7 @@
 <header>
   <div class="logo">
     <span class="logo-icon">⬡</span>
-    <div class="logo-text">cpptraj <span>IDE</span></div>
+    <div class="logo-text">cpptraj<span style="color:var(--accent2)">GPT</span></div>
   </div>
   <div class="header-search">
     <span class="search-icon">⌕</span>
@@ -795,7 +796,7 @@
         <span id="termStatus" style="color:var(--accent2)">●  IDLE</span>
       </div>
       <div class="terminal-body" id="termBody">
-        <span class="t-line t-info">cpptraj IDE — Molecular Dynamics Analysis Studio</span>
+        <span class="t-line t-info">CpptrajGPT — Molecular Dynamics Analysis Studio</span>
         <span class="t-line t-info">Upload topology + trajectory files, write your script, click ▶ Run.</span>
         <span class="t-line t-info">Use ⚙ in the header to set your Anthropic API key for the AI Agent.</span>
         <span class="t-line t-info">─────────────────────────────────────────────────────────</span>
@@ -813,7 +814,7 @@
     <div class="right-tabs">
       <button class="rtab active" onclick="setRightTab('files',  this)" id="rtab-files">Files</button>
       <button class="rtab"        onclick="setRightTab('detail', this)" id="rtab-detail">Detail</button>
-      <button class="rtab"        onclick="setRightTab('ai',     this)" id="rtab-ai">✦ AI Agent</button>
+      <button class="rtab"        onclick="setRightTab('ai',     this)" id="rtab-ai">⚡ AI Agent</button>
       <button class="rtab"        onclick="setRightTab('output', this)" id="rtab-output">Output</button>
       <button class="rtab"        onclick="setRightTab('viewer', this)" id="rtab-viewer">⬡ Viewer</button>
     </div>
@@ -879,7 +880,7 @@
       <div class="chip-row" id="chipRow"></div>
       <div class="chat-messages" id="chatMessages">
         <div class="no-select" style="padding:30px 10px">
-          <div class="big">✦</div>
+          <div class="big">⚡</div>
           <div style="font-size:12px">Describe your analysis in plain<br>English. The agent writes and<br>runs the cpptraj script for you.</div>
         </div>
       </div>
@@ -1895,6 +1896,13 @@ const PROVIDER_INFO = {
       { id:'gemini-2.0-pro-exp',     label:'Gemini 2.0 Pro Exp — experimental' },
     ],
   },
+  ollama: {
+    hint: 'Run locally — no API key needed. Make sure Ollama is running: ollama serve',
+    models: [
+      { id:'qwen2.5-coder:7b', label:'qwen2.5-coder:7b — recommended (~8GB RAM)' },
+    ],
+    noKey: true,
+  },
 };
 
 function openSettings() {
@@ -1914,13 +1922,18 @@ function onProviderChange() {
     `<option value="${m.id}">${m.label}</option>`
   ).join('');
   document.getElementById('providerHint').textContent = info.hint;
+  const keyRow = document.getElementById('apiKeyLabel');
+  const keyInput = document.getElementById('apiKeyInput');
+  const hide = info.noKey;
+  keyRow.style.display   = hide ? 'none' : '';
+  keyInput.style.display = hide ? 'none' : '';
 }
 
 async function saveSettings() {
   const provider  = document.getElementById('providerSelect').value;
-  const api_key   = document.getElementById('apiKeyInput').value.trim();
+  const api_key   = provider === 'ollama' ? '' : document.getElementById('apiKeyInput').value.trim();
   const model     = document.getElementById('modelSelect').value;
-  const base_url  = '';
+  const base_url  = provider === 'ollama' ? 'http://localhost:11434/v1' : '';
   try {
     const r = await fetch('/api/set_provider', {
       method: 'POST',
