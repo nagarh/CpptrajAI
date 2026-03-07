@@ -703,6 +703,8 @@
 
     <div class="modal-note" id="providerHint" style="background:rgba(88,166,255,0.07);border:1px solid var(--border);border-radius:6px;padding:8px 10px;margin-bottom:12px"></div>
 
+    <div id="ollamaStatus" style="display:none;padding:8px 10px;border-radius:6px;margin-bottom:12px;font-size:12px;font-family:'JetBrains Mono',monospace"></div>
+
     <div class="modal-btns">
       <button class="btn btn-ghost" onclick="closeSettings()">Cancel</button>
       <button class="btn btn-primary" onclick="saveSettings()">Apply</button>
@@ -1914,7 +1916,7 @@ function closeSettings() {
   document.getElementById('settingsModal').classList.remove('open');
 }
 
-function onProviderChange() {
+async function onProviderChange() {
   const p    = document.getElementById('providerSelect').value;
   const info = PROVIDER_INFO[p] || PROVIDER_INFO.claude;
   const sel  = document.getElementById('modelSelect');
@@ -1922,11 +1924,47 @@ function onProviderChange() {
     `<option value="${m.id}">${m.label}</option>`
   ).join('');
   document.getElementById('providerHint').textContent = info.hint;
-  const keyRow = document.getElementById('apiKeyLabel');
+  const keyRow   = document.getElementById('apiKeyLabel');
   const keyInput = document.getElementById('apiKeyInput');
-  const hide = info.noKey;
+  const hide     = info.noKey;
   keyRow.style.display   = hide ? 'none' : '';
   keyInput.style.display = hide ? 'none' : '';
+
+  const statusEl = document.getElementById('ollamaStatus');
+  if (p === 'ollama') {
+    statusEl.style.display = 'block';
+    statusEl.style.background = 'rgba(227,179,65,0.1)';
+    statusEl.style.border = '1px solid var(--accent4)';
+    statusEl.style.color  = 'var(--accent4)';
+    statusEl.textContent  = '⏳ Checking if Ollama is running…';
+    try {
+      const r    = await fetch('/api/check_ollama');
+      const data = await r.json();
+      if (data.running && data.has_qwen) {
+        statusEl.style.background = 'rgba(63,185,80,0.1)';
+        statusEl.style.border     = '1px solid var(--accent2)';
+        statusEl.style.color      = 'var(--accent2)';
+        statusEl.textContent      = '✓ Ollama is running — qwen2.5-coder:7b detected';
+      } else if (data.running && !data.has_qwen) {
+        statusEl.style.background = 'rgba(227,179,65,0.1)';
+        statusEl.style.border     = '1px solid var(--accent4)';
+        statusEl.style.color      = 'var(--accent4)';
+        statusEl.textContent      = '⚠ Ollama running but qwen2.5-coder:7b not found — run: ollama pull qwen2.5-coder:7b';
+      } else {
+        statusEl.style.background = 'rgba(247,129,102,0.1)';
+        statusEl.style.border     = '1px solid var(--accent3)';
+        statusEl.style.color      = 'var(--accent3)';
+        statusEl.textContent      = '✗ Ollama not detected — start it with: ollama serve';
+      }
+    } catch {
+      statusEl.style.background = 'rgba(247,129,102,0.1)';
+      statusEl.style.border     = '1px solid var(--accent3)';
+      statusEl.style.color      = 'var(--accent3)';
+      statusEl.textContent      = '✗ Could not reach Ollama — start it with: ollama serve';
+    }
+  } else {
+    statusEl.style.display = 'none';
+  }
 }
 
 async function saveSettings() {

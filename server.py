@@ -18,6 +18,7 @@ import json
 import os
 import tempfile
 import traceback
+import urllib.request
 from pathlib import Path
 
 from flask import Flask, Response, jsonify, request, send_from_directory
@@ -333,6 +334,20 @@ def set_provider():
 @app.route("/api/providers")
 def list_providers():
     return jsonify(PROVIDER_DEFAULTS)
+
+
+@app.route("/api/check_ollama")
+def check_ollama():
+    try:
+        url = os.environ.get("OLLAMA_HOST", "http://localhost:11434") + "/api/tags"
+        req = urllib.request.Request(url, headers={"Accept": "application/json"})
+        with urllib.request.urlopen(req, timeout=3) as resp:
+            data = json.loads(resp.read())
+        models = [m["name"] for m in data.get("models", [])]
+        has_qwen = any("qwen2.5-coder" in m for m in models)
+        return jsonify({"running": True, "models": models, "has_qwen": has_qwen})
+    except Exception:
+        return jsonify({"running": False, "models": [], "has_qwen": False})
 
 
 # ─────────────────────────────────────────────────────────────────────────────
