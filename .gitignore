@@ -14,9 +14,8 @@ build/
 venv/
 env/
 
-# Data files (large binaries)
-test_data/*.nc
-test_data/*.prmtop
+# Large files
+CpptrajManual.pdf
 Test/
 
 # Sensitive
