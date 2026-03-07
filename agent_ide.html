@@ -1909,7 +1909,8 @@ const PROVIDER_INFO = {
   ollama: {
     hint: 'Run locally — no API key needed. Make sure Ollama is running: ollama serve',
     models: [
-      { id:'qwen2.5-coder:7b', label:'qwen2.5-coder:7b — recommended (~8GB RAM)' },
+      { id:'llama3.1:8b',      label:'llama3.1:8b      — recommended, better instruction following (~8GB RAM)' },
+      { id:'qwen2.5-coder:7b', label:'qwen2.5-coder:7b — good at code generation (~8GB RAM)' },
     ],
     noKey: true,
   },

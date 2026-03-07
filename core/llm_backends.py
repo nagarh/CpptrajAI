@@ -194,13 +194,6 @@ class OpenAICompatBackend(LLMBackend):
             except Exception: inp = {}
             tool_calls.append({"id": tc["id"], "name": tc["name"], "input": inp})
 
-        # Fallback: model printed tool calls as text instead of using native calling
-        if not tool_calls and text_chunks:
-            full_text = "".join(text_chunks)
-            tool_calls = _extract_text_tool_calls(full_text)
-            if tool_calls:
-                finish_reason = "tool_calls"
-
         yield ("tool_calls", tool_calls)
         yield ("stop_reason", "tool_calls" if finish_reason == "tool_calls" else "end_turn")
 
