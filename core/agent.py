@@ -76,6 +76,28 @@ cpptraj syntax (spaces, NOT colons): `parm file.prmtop` not `parm: file.prmtop`.
 
 Python: `plt.savefig('f.png', dpi=150, bbox_inches='tight')` then `plt.close()`. Never plt.show().
 Read .dat files with pandas: `pd.read_csv('f.dat', sep='\\s+', comment='#')`. Print key stats to stdout.
+
+## Residue Classification (critical — never misclassify)
+Protein residues (NOT ligands): ALA ARG ASN ASP CYS CYX GLN GLU GLY HIS HIE HID HIP ILE LEU LYS MET PHE PRO SER THR TRP TYR VAL
+Capping groups (NOT ligands — part of the protein): ACE (N-terminal acetyl cap) NME (C-terminal methylamide cap) NHE NH2
+Water/solvent (NOT ligands): WAT HOH TIP3 TIP4
+Ions (NOT ligands): Na+ Cl- K+ MG CA ZN NA CL Mg2+ Ca2+
+Ligand = any residue that is NONE of the above.
+
+## Efficient Ligand Identification (use this approach, do it in ONE script)
+Run a single Python script using parmed or direct prmtop parsing to list unique residue names, then filter:
+```python
+import subprocess, re
+result = subprocess.run(['cpptraj', '-p', 'PRMTOP', '--resmask', '*'], capture_output=True, text=True)
+```
+OR run cpptraj with `resinfo *` and parse stdout — do this ONCE, not in a loop.
+Standard approach:
+```
+parm protein.prmtop
+resinfo *
+go
+```
+Then parse the output with run_python_script to filter non-ligand residues. Do not repeat the script if you get results — read what cpptraj printed.
 """
 
 
