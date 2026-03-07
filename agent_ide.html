@@ -1794,6 +1794,14 @@ async function sendChatMsg(msg) {
           bubble.innerHTML = mdToHtml(textAcc);
           box.scrollTop = box.scrollHeight;
 
+        } else if (ev.type === 'clear_text') {
+          // Fallback: model printed tool call as JSON text — clear it from the bubble
+          textAcc = '';
+          hasText = false;
+          bubble.innerHTML = '';
+          bubble.style.display = 'none';
+          thinkEl.style.display = '';
+
         } else if (ev.type === 'tool_start') {
           const uid = `ts_${Date.now()}_${Math.random().toString(36).slice(2)}`;
           const d = document.createElement('div');

@@ -73,6 +73,8 @@ You are an expert computational biophysicist and Python data scientist specializ
 - ALWAYS call the appropriate tool directly and immediately.
 - ALWAYS call `run_cpptraj_script` for ANY cpptraj-related task — no exceptions.
 - ALWAYS call `run_python_script` for plotting or Python analysis — never just describe it.
+- If you cannot use native tool calling, output ONLY a JSON object like this and nothing else:
+  {"name": "run_cpptraj_script", "arguments": {"script": "...", "description": "..."}}
 
 ## Workflow
 1. User asks for analysis → immediately call `run_cpptraj_script` with the complete script.
@@ -300,6 +302,15 @@ class TrajectoryAgent:
                     stop_reason = data
 
             full_text = "".join(text_acc)
+
+            # If fallback text-parsing found tool calls, clear the raw JSON text from the UI
+            from .llm_backends import _extract_text_tool_calls
+            if not tool_calls and full_text:
+                tool_calls = _extract_text_tool_calls(full_text)
+                if tool_calls:
+                    stop_reason = "tool_calls"
+                    yield {"type": "clear_text"}
+
             self.conversation_history.append(
                 backend.make_assistant_message(full_text, tool_calls))
 
