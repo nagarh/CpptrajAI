@@ -114,6 +114,7 @@ class TrajectoryAgent:
         self.conversation_history: list[dict] = []
         self.parm_file: Path | None = None
         self.traj_files: list[Path] = []
+        self._topology_info: dict = {}
 
         provider = provider or os.environ.get("LLM_PROVIDER", "claude")
         model    = model    or os.environ.get("LLM_MODEL", "")
@@ -126,9 +127,47 @@ class TrajectoryAgent:
         self._backend = create_backend(provider, api_key, model, base_url)
         self.conversation_history = []
 
+    # Known protein/solvent/ion residue names — anything else is a ligand
+    _KNOWN_NON_LIGAND = {
+        "ALA","ARG","ASN","ASP","CYS","CYX","GLN","GLU","GLY",
+        "HIS","HIE","HID","HIP","ILE","LEU","LYS","MET","PHE",
+        "PRO","SER","THR","TRP","TYR","VAL",
+        "ACE","NME","NHE","NH2",                        # caps
+        "WAT","HOH","TIP3","TIP4",                      # water
+        "NA","CL","K","MG","CA","ZN","NA+","CL-","K+",  # ions
+        "Na+","Cl-","Mg2+","Ca2+",
+    }
+
     def set_files(self, parm_file: Path | None, traj_files: list[Path]):
         self.parm_file = parm_file
         self.traj_files = traj_files
+        self._topology_info: dict = {}
+        if parm_file and parm_file.exists():
+            self._scan_topology(parm_file)
+
+    def _scan_topology(self, parm_file: Path):
+        """Run resinfo once on upload and cache ligand/residue info."""
+        import re
+        script = f"parm {parm_file}\nresinfo *\ngo"
+        res = self.runner.run_script(script)
+        stdout = res.get("stdout", "")
+        ligands, n_protein, n_water = [], 0, 0
+        for line in stdout.splitlines():
+            m = re.match(r'\s*(\d+)\s+(\S+)\s+\d+\s+\d+\s+(\d+)\s+', line)
+            if not m:
+                continue
+            resid, resname, natoms = int(m.group(1)), m.group(2), int(m.group(3))
+            if resname in ("WAT","HOH","TIP3","TIP4"):
+                n_water += 1
+            elif resname.upper() in self._KNOWN_NON_LIGAND:
+                n_protein += 1
+            else:
+                ligands.append({"resid": resid, "name": resname, "natoms": natoms})
+        self._topology_info = {
+            "n_protein_res": n_protein,
+            "n_water": n_water,
+            "ligands": ligands,
+        }
 
     def reset_conversation(self):
         self.conversation_history = []
@@ -197,9 +236,24 @@ class TrajectoryAgent:
             for tf in self.traj_files: parts.append(f"- Trajectory: `{tf.name}`")
         else:
             parts.append("- Trajectory: *not uploaded yet*")
+
+        info = getattr(self, "_topology_info", {})
+        if info:
+            parts.append(f"\n## Topology Composition")
+            parts.append(f"- Protein residues: {info['n_protein_res']}")
+            parts.append(f"- Water molecules: {info['n_water']}")
+            ligs = info.get("ligands", [])
+            if ligs:
+                parts.append(f"- Ligands ({len(ligs)} molecule{'s' if len(ligs)>1 else ''}):")
+                for lig in ligs:
+                    parts.append(f"    • {lig['name']} — residue :{lig['resid']} — {lig['natoms']} atoms")
+                    parts.append(f"      → protein mask: :1-{ligs[0]['resid']-1}  ligand mask: :{lig['resid']}")
+            else:
+                parts.append("- Ligands: none detected")
+
         existing = self.runner.list_output_files()
         if existing:
-            parts.append("\nExisting output files:")
+            parts.append("\n## Existing Output Files")
             for f in existing: parts.append(f"  - {f.name}")
         return "\n".join(parts)
 
