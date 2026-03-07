@@ -135,9 +135,7 @@ CpptrajGPT/
 
 ## Supported Analyses
 
-CpptrajGPT supports **all 154+ cpptraj commands** via RAG — the full cpptraj manual is indexed and retrieved at query time, so any analysis cpptraj can perform can be requested via prompt.
-
-Common examples include:
+CpptrajGPT supports all analyses available in CPPTRAJ. Common examples include:
 
 | Category | Analyses |
 |----------|----------|
@@ -150,7 +148,7 @@ Common examples include:
 | **Density & maps** | Volumetric density maps, density profiles |
 | **Specialized** | Ring pucker, multidihedral (φ/ψ/χ), trajectory imaging, stripping |
 
-Any command not listed above can still be used — just prompt the AI and it will look it up from the cpptraj manual automatically.
+Any analysis not listed above can still be requested via prompt.
 
 ## Supported File Formats
 
