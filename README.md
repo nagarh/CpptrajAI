@@ -70,6 +70,13 @@ ollama pull qwen2.5-coder:7b
 ollama serve
 ```
 
+> Ollama runs a local server at **`http://localhost:11434`** (fixed default port).
+> CpptrajGPT automatically pings this URL to verify Ollama is running and the model is available.
+> You will see a live status indicator in the ⚙ Settings modal:
+> - ✅ Green — Ollama running and `qwen2.5-coder:7b` detected
+> - ⚠️ Yellow — Ollama running but model not pulled yet (run `ollama pull qwen2.5-coder:7b`)
+> - ❌ Red — Ollama not running (run `ollama serve`)
+
 #### Option B — Cloud AI (API key required)
 
 | Provider | Where to get key | Notes |
