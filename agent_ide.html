@@ -891,6 +891,7 @@
             onkeydown="chatKeydown(event)"></textarea>
         </div>
         <button class="chat-send-btn" id="chatSendBtn" onclick="sendChat()">Send</button>
+        <button class="chat-send-btn" id="chatStopBtn" onclick="stopChat()" style="display:none;background:var(--accent3);border-color:var(--accent3)">Stop</button>
       </div>
       <div style="background:var(--surface);border-top:1px solid var(--border);padding:6px 12px;display:flex;gap:6px;flex-shrink:0">
         <button class="btn btn-ghost" style="font-size:10px;padding:3px 10px" onclick="resetChat()">Clear chat</button>
@@ -1722,8 +1723,10 @@ async function sendChatMsg(msg) {
 
   appendChatMsg('user', escHtml(msg), null);
 
-  const btn = document.getElementById('chatSendBtn');
-  btn.disabled = true;
+  const btn     = document.getElementById('chatSendBtn');
+  const stopBtn = document.getElementById('chatStopBtn');
+  btn.style.display     = 'none';
+  stopBtn.style.display = '';
 
   // Create AI bubble immediately (will be filled by stream)
   const msgId    = `msg_${Date.now()}_${Math.random().toString(36).slice(2)}`;
@@ -1847,6 +1850,11 @@ async function sendChatMsg(msg) {
           if (!hasText) bubble.style.display = 'none';
           if (ranScript) await refreshOutputFiles();
 
+        } else if (ev.type === 'stopped') {
+          thinkEl.style.display = 'none';
+          bubble.style.display = '';
+          if (!hasText) bubble.innerHTML = `<span style="color:var(--text-muted)">⏹ Stopped.</span>`;
+
         } else if (ev.type === 'error') {
           thinkEl.style.display = 'none';
           bubble.style.display = '';
@@ -1860,7 +1868,16 @@ async function sendChatMsg(msg) {
     bubble.innerHTML = `<span style="color:var(--accent3)">Network error: ${escHtml(e.message)}</span>`;
   }
 
-  btn.disabled = false;
+  btn.style.display     = '';
+  stopBtn.style.display = 'none';
+}
+
+async function stopChat() {
+  try { await fetch('/api/chat/stop', {method:'POST'}); } catch {}
+  const btn     = document.getElementById('chatSendBtn');
+  const stopBtn = document.getElementById('chatStopBtn');
+  btn.style.display     = '';
+  stopBtn.style.display = 'none';
 }
 
 async function resetChat() {

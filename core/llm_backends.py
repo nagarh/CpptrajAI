@@ -86,7 +86,7 @@ class ClaudeBackend(LLMBackend):
 
     def chat(self, messages, tools, system):
         response = self._client.messages.create(
-            model=self._model, max_tokens=2048,
+            model=self._model, max_tokens=4096,
             system=system, tools=self._claude_tools(tools), messages=messages,
         )
         text_parts, tool_calls = [], []
@@ -111,7 +111,7 @@ class ClaudeBackend(LLMBackend):
     def stream_chat(self, messages, tools, system):
         claude_tools = self._claude_tools(tools)
         with self._client.messages.stream(
-            model=self._model, max_tokens=2048,
+            model=self._model, max_tokens=4096,
             system=system, tools=claude_tools, messages=messages,
         ) as stream:
             for text in stream.text_stream:
@@ -166,7 +166,7 @@ class OpenAICompatBackend(LLMBackend):
     def stream_chat(self, messages, tools, system):
         oai_tools = self._oai_tools(tools)
         full_messages = [{"role": "system", "content": system}] + messages
-        kwargs: dict[str, Any] = dict(model=self._model, messages=full_messages, max_tokens=2048, stream=True)
+        kwargs: dict[str, Any] = dict(model=self._model, messages=full_messages, max_tokens=4096, stream=True)
         if oai_tools:
             kwargs["tools"] = oai_tools
         response = self._client.chat.completions.create(**kwargs)
@@ -200,7 +200,7 @@ class OpenAICompatBackend(LLMBackend):
     def chat(self, messages, tools, system):
         oai_tools = self._oai_tools(tools)
         full_messages = [{"role": "system", "content": system}] + messages
-        kwargs: dict[str, Any] = dict(model=self._model, messages=full_messages, max_tokens=2048)
+        kwargs: dict[str, Any] = dict(model=self._model, messages=full_messages, max_tokens=4096)
         if oai_tools:
             kwargs["tools"] = oai_tools
         response = self._client.chat.completions.create(**kwargs)

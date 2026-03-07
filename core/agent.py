@@ -121,7 +121,7 @@ class TrajectoryAgent:
         q  = query.lower()
         if any(kw in q for kw in self._SKIP_RAG):
             return f"{fc}\n\n## User Request\n{query}"
-        rag = self.kb.get_context_for_llm(query, top_k=2)
+        rag = self.kb.get_context_for_llm(query, top_k=3)
         return f"{fc}\n\n{rag}\n\n## User Request\n{query}"
 
     def _trim_history(self, history: list) -> list:
@@ -131,7 +131,7 @@ class TrajectoryAgent:
         We must never start the window on such a message — doing so produces orphaned
         tool_result blocks that the API rejects with a 400.
         """
-        if len(history) <= 6:
+        if len(history) <= 8:
             return history
 
         # Identify indices of genuine user-text messages (not tool-result wrappers)
@@ -151,15 +151,15 @@ class TrajectoryAgent:
         # Keep the last 3 real turns; if fewer exist, return the full history
         if len(real_user_idx) <= 3:
             return history
-        return history[real_user_idx[-3]:]
+        return history[real_user_idx[-4]:]
 
     @staticmethod
     def _compress_result(result: str) -> str:
         """Trim tool result stored in history to save tokens."""
-        if len(result) <= 300:
+        if len(result) <= 600:
             return result
         lines = result.splitlines()
-        head = "\n".join(lines[:12])
+        head = "\n".join(lines[:20])
         return f"{head}\n… [{len(lines)} lines total, truncated]"
 
     def _build_file_context(self) -> str:
@@ -183,8 +183,8 @@ class TrajectoryAgent:
                 script = self.runner.inject_paths_into_script(script, self.parm_file, self.traj_files)
             res = self.runner.run_script(script)
             out = [f"Success: {res['success']}", f"Elapsed: {res['elapsed']:.1f}s"]
-            if res["stdout"]: out.append(f"\nSTDOUT:\n{res['stdout'][:800]}")
-            if res["stderr"]: out.append(f"\nSTDERR:\n{res['stderr'][:400]}")
+            if res["stdout"]: out.append(f"\nSTDOUT:\n{res['stdout'][:1500]}")
+            if res["stderr"]: out.append(f"\nSTDERR:\n{res['stderr'][:800]}")
             if res["output_files"]:
                 out.append("Output files:")
                 for f in res["output_files"]: out.append(f"  - {f.name}")
@@ -220,8 +220,8 @@ class TrajectoryAgent:
                 after    = set(work_dir.iterdir())
                 new_files = sorted(after - before, key=lambda f: f.name)
                 out = [f"Success: {proc.returncode == 0}"]
-                if proc.stdout: out.append(f"\nSTDOUT:\n{proc.stdout[:1000]}")
-                if proc.stderr: out.append(f"\nSTDERR:\n{proc.stderr[:400]}")
+                if proc.stdout: out.append(f"\nSTDOUT:\n{proc.stdout[:2000]}")
+                if proc.stderr: out.append(f"\nSTDERR:\n{proc.stderr[:800]}")
                 if new_files:
                     out.append("New files created:")
                     for f in new_files: out.append(f"  - {f.name} ({f.stat().st_size} bytes)")

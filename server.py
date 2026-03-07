@@ -17,6 +17,7 @@ Endpoints:
 import json
 import os
 import tempfile
+import threading
 import traceback
 from pathlib import Path
 
@@ -34,6 +35,8 @@ from core.llm_backends import PROVIDER_DEFAULTS
 
 app = Flask(__name__, static_folder=".")
 CORS(app)
+
+_stop_event = threading.Event()  # set to abort the current agent stream
 
 WORK_DIR = Path(tempfile.mkdtemp(prefix="cpptraj_ide_"))
 _CPPTRAJ_BIN = os.environ.get(
@@ -187,9 +190,14 @@ def chat_stream():
     if ag is None:
         return jsonify({"error": "No LLM configured. Click ⚙ Settings to choose a provider and enter your API key."}), 400
 
+    _stop_event.clear()
+
     def generate():
         try:
             for event in ag.chat_stream(message):
+                if _stop_event.is_set():
+                    yield ("data: " + json.dumps({"type": "stopped"}, ensure_ascii=False) + "\n\n").encode("utf-8")
+                    return
                 yield ("data: " + json.dumps(event, ensure_ascii=False) + "\n\n").encode("utf-8")
         except Exception as e:
             tb = traceback.format_exc()
@@ -199,6 +207,12 @@ def chat_stream():
 
     return Response(generate(), content_type="text/event-stream; charset=utf-8",
                     headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+
+
+@app.route("/api/chat/stop", methods=["POST"])
+def chat_stop():
+    _stop_event.set()
+    return jsonify({"ok": True})
 
 
 @app.route("/api/chat/reset", methods=["POST"])
