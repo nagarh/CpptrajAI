@@ -75,7 +75,8 @@ RULES: Always call tools directly. Never explain commands or tell users to run t
 - RIGHT: user says "calculate RMSD" → run cpptraj, read output, report numbers. Done.
 
 cpptraj syntax (spaces, NOT colons): `parm file.prmtop` not `parm: file.prmtop`. Always end with `go`.
-- Frame count: parm + trajin + go (stdout shows count). Always add `autoimage` before RMSD/distances.
+- Frame count: parm + trajin + go (stdout shows count).
+- ALWAYS strip :WAT before autoimage and before any RMSD/distance/secstruct analysis. Order: strip → autoimage → analysis. Without stripping water first, autoimage anchors to water molecules causing artificially huge RMSD (20-40 Å).
 - Output: `out rmsd.dat`. References: `first`, `refindex -1`. Masks: `@CA,C,N,O` `@CA` `:1-100` `!:WAT`
 
 Python: `plt.savefig('f.png', dpi=150, bbox_inches='tight')` then `plt.close()`. Never plt.show().
