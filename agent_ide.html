@@ -1,0 +1,2413 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>cpptraj IDE — Molecular Dynamics Analysis Studio</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/ngl@2.0.0-dev.37/dist/ngl.js"></script>
+<style>
+  :root {
+    --bg: #0d1117;
+    --surface: #161b22;
+    --surface2: #21262d;
+    --surface3: #30363d;
+    --border: #30363d;
+    --accent: #58a6ff;
+    --accent2: #3fb950;
+    --accent3: #f78166;
+    --accent4: #e3b341;
+    --text: #e6edf3;
+    --text-muted: #8b949e;
+    --text-dim: #484f58;
+    --keyword: #ff7b72;
+    --option: #79c0ff;
+    --string: #a5d6ff;
+    --comment: #8b949e;
+    --number: #f0883e;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Syne', sans-serif;
+    height: 100vh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* HEADER */
+  header {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 0 16px;
+    height: 52px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex-shrink: 0;
+    z-index: 100;
+  }
+  .logo {
+    font-size: 18px;
+    font-weight: 800;
+    letter-spacing: -0.5px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .logo-icon { color: var(--accent); font-family: 'JetBrains Mono', monospace; font-size: 20px; }
+  .logo-text span { color: var(--accent); }
+  .header-search {
+    flex: 1;
+    max-width: 400px;
+    position: relative;
+  }
+  .header-search input {
+    width: 100%;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 7px 12px 7px 36px;
+    color: var(--text);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  .header-search input:focus { border-color: var(--accent); }
+  .header-search .search-icon {
+    position: absolute;
+    left: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--text-muted);
+    font-size: 14px;
+  }
+  .header-right {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .btn {
+    padding: 6px 14px;
+    border-radius: 6px;
+    font-family: 'Syne', sans-serif;
+    font-weight: 600;
+    font-size: 13px;
+    cursor: pointer;
+    border: none;
+    transition: all 0.15s;
+  }
+  .btn-primary { background: var(--accent); color: #000; }
+  .btn-primary:hover { background: #79b8ff; }
+  .btn-success { background: var(--accent2); color: #000; }
+  .btn-success:hover { background: #56d364; }
+  .btn-ghost { background: transparent; color: var(--text-muted); border: 1px solid var(--border); }
+  .btn-ghost:hover { border-color: var(--accent); color: var(--accent); }
+  .btn-danger { background: transparent; color: var(--accent3); border: 1px solid var(--border); }
+  .btn-danger:hover { background: rgba(247, 129, 102, 0.1); }
+
+  /* status indicators */
+  .status-pills { display: flex; gap: 8px; align-items: center; }
+  .spill {
+    display: flex; align-items: center; gap: 5px;
+    font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--text-muted);
+  }
+  .sdot { width: 7px; height: 7px; border-radius: 50%; background: var(--text-dim); }
+  .sdot.on  { background: var(--accent2); }
+  .sdot.off { background: var(--accent3); }
+
+  /* MAIN LAYOUT */
+  .main {
+    display: flex;
+    flex-direction: row;
+    flex: 1;
+    overflow: hidden;
+  }
+  .panel-left   { width: 280px; flex-shrink: 0; }
+  .panel-center { flex: 1; min-width: 200px; }
+  .panel-right  { width: 420px; flex-shrink: 0; }
+
+  /* RESIZE DIVIDERS */
+  .divider {
+    width: 4px;
+    background: var(--border);
+    cursor: col-resize;
+    flex-shrink: 0;
+    position: relative;
+    transition: background 0.15s;
+    z-index: 10;
+  }
+  .divider:hover, .divider.dragging { background: var(--accent); }
+  .h-divider {
+    height: 4px;
+    background: var(--border);
+    cursor: row-resize;
+    flex-shrink: 0;
+  }
+  .h-divider:hover, .h-divider.dragging { background: var(--accent); }
+  .divider::after {
+    content: '';
+    position: absolute;
+    top: 0; bottom: 0;
+    left: -4px; right: -4px;
+  }
+
+  /* LEFT PANEL - COMMAND REFERENCE */
+  .panel-left {
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .panel-header {
+    padding: 10px 14px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .filter-tabs {
+    display: flex;
+    gap: 2px;
+    padding: 8px 10px;
+    border-bottom: 1px solid var(--border);
+    flex-wrap: wrap;
+  }
+  .filter-tab {
+    padding: 3px 10px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+    border: 1px solid var(--border);
+    color: var(--text-muted);
+    transition: all 0.15s;
+    background: transparent;
+  }
+  .filter-tab.active { background: var(--accent); border-color: var(--accent); color: #000; }
+  .filter-tab:hover:not(.active) { border-color: var(--accent); color: var(--accent); }
+  .cmd-list {
+    overflow-y: auto;
+    flex: 1;
+    padding: 4px;
+  }
+  .cmd-list::-webkit-scrollbar { width: 4px; }
+  .cmd-list::-webkit-scrollbar-track { background: transparent; }
+  .cmd-list::-webkit-scrollbar-thumb { background: var(--surface3); border-radius: 2px; }
+  .cmd-item {
+    padding: 8px 10px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background 0.1s;
+    margin-bottom: 1px;
+  }
+  .cmd-item:hover { background: var(--surface2); }
+  .cmd-item.active { background: var(--surface2); border-left: 2px solid var(--accent); }
+  .cmd-name {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--keyword);
+    margin-bottom: 2px;
+  }
+  .cmd-desc {
+    font-size: 11px;
+    color: var(--text-muted);
+    line-height: 1.4;
+  }
+  .cmd-badge {
+    display: inline-block;
+    font-size: 9px;
+    padding: 1px 6px;
+    border-radius: 3px;
+    font-weight: 700;
+    margin-left: 6px;
+    vertical-align: middle;
+  }
+  .badge-analysis { background: rgba(88,166,255,0.15); color: var(--accent); }
+  .badge-action   { background: rgba(63,185,80,0.15);  color: var(--accent2); }
+  .badge-input    { background: rgba(227,179,65,0.15); color: var(--accent4); }
+  .badge-output   { background: rgba(247,129,102,0.15);color: var(--accent3); }
+
+  /* CENTER - EDITOR */
+  .panel-center {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .editor-toolbar {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 8px 14px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .file-tabs { display: flex; gap: 2px; flex: 1; }
+  .file-tab {
+    padding: 4px 12px;
+    border-radius: 4px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    cursor: pointer;
+    color: var(--text-muted);
+    background: transparent;
+    border: 1px solid transparent;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    transition: all 0.15s;
+  }
+  .file-tab.active { background: var(--surface2); border-color: var(--border); color: var(--text); }
+  .file-tab:hover:not(.active) { color: var(--text); }
+  .file-tab-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent4); }
+  .editor-area { flex: 1; position: relative; overflow: hidden; }
+  .editor-wrapper { display: flex; height: 100%; }
+  .line-numbers {
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    padding: 14px 0;
+    min-width: 50px;
+    text-align: right;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    color: var(--text-dim);
+    overflow: hidden;
+    user-select: none;
+  }
+  .line-numbers span { display: block; padding: 0 12px; line-height: 22px; }
+  #editor {
+    flex: 1;
+    background: var(--bg);
+    border: none;
+    outline: none;
+    color: var(--text);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    line-height: 22px;
+    padding: 14px 16px;
+    resize: none;
+    white-space: pre;
+    overflow: auto;
+    tab-size: 2;
+    caret-color: var(--accent);
+  }
+  .editor-status {
+    background: var(--surface);
+    border-top: 1px solid var(--border);
+    padding: 4px 14px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    font-size: 11px;
+    color: var(--text-muted);
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .status-item { display: flex; align-items: center; gap: 4px; }
+  .status-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent2); }
+
+  /* TERMINAL */
+  .terminal {
+    border-top: 1px solid var(--border);
+    background: #010409;
+    height: 260px;
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0;
+  }
+  .terminal-header {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 6px 14px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    flex-shrink: 0;
+  }
+  .terminal-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 10px 14px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    line-height: 1.7;
+  }
+  .terminal-body::-webkit-scrollbar { width: 4px; }
+  .terminal-body::-webkit-scrollbar-thumb { background: var(--surface3); border-radius: 2px; }
+  .t-line { display: block; }
+  .t-prompt  { color: var(--accent2); }
+  .t-info    { color: var(--text-muted); }
+  .t-success { color: var(--accent2); }
+  .t-warning { color: var(--accent4); }
+  .t-error   { color: var(--accent3); }
+  .t-data    { color: var(--accent); }
+
+  /* right-tab-content must fill the panel */
+  .right-tab-content { flex:1; min-height:0; overflow:hidden; }
+
+  /* VIEWER PANEL */
+  .viewer-panel { display:flex; flex-direction:column; overflow:hidden; background:#0d1117; }
+  #ngl-stage { flex:1; min-height:0; min-width:0; position:relative; cursor:grab; overflow:hidden; }
+  #ngl-stage:active { cursor:grabbing; }
+  #ngl-stage canvas { position:absolute !important; top:0; left:0; width:100% !important; height:100% !important; }
+  .viewer-controls {
+    background:var(--surface); border-top:1px solid var(--border);
+    padding:8px 12px; display:flex; flex-direction:column; gap:6px; flex-shrink:0;
+  }
+  .viewer-row { display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
+  .viewer-select {
+    background:var(--surface2); border:1px solid var(--border); color:var(--text);
+    border-radius:4px; padding:3px 6px; font-size:11px; font-family:'JetBrains Mono',monospace;
+    cursor:pointer;
+  }
+  .viewer-select:focus { outline:none; border-color:var(--accent); }
+  .viewer-slider { flex:1; accent-color:var(--accent); cursor:pointer; height:3px; min-width:60px; }
+  .viewer-frame { font-family:'JetBrains Mono',monospace; font-size:10px; color:var(--accent); min-width:60px; text-align:right; }
+  .viewer-label { font-size:10px; color:var(--text-muted); white-space:nowrap; }
+  .viewer-empty { display:flex; flex-direction:column; align-items:center; justify-content:center; flex:1; gap:10px; color:var(--text-muted); font-size:12px; }
+
+  /* RIGHT PANEL */
+  .panel-right {
+    background: var(--surface);
+    border-left: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  /* Right panel mode tabs */
+  .right-tabs {
+    display: flex;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+    background: var(--surface);
+  }
+  .rtab {
+    flex: 1;
+    padding: 9px 6px;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    cursor: pointer;
+    border: none;
+    background: transparent;
+    border-bottom: 2px solid transparent;
+    transition: all 0.15s;
+    text-align: center;
+    font-family: 'Syne', sans-serif;
+  }
+  .rtab:hover { color: var(--text); }
+  .rtab.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+  /* Files section */
+  .files-section { border-bottom: 1px solid var(--border); }
+  .upload-zone {
+    margin: 10px;
+    border: 2px dashed var(--border);
+    border-radius: 8px;
+    padding: 16px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s;
+    position: relative;
+  }
+  .upload-zone:hover, .upload-zone.drag-over {
+    border-color: var(--accent);
+    background: rgba(88,166,255,0.05);
+  }
+  .upload-zone input[type=file] {
+    position: absolute; inset: 0; opacity: 0; cursor: pointer;
+  }
+  .upload-icon { font-size: 24px; margin-bottom: 6px; }
+  .upload-text { font-size: 12px; color: var(--text-muted); }
+  .upload-text strong { color: var(--accent); }
+  .file-list { padding: 0 10px 10px; }
+  .file-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 8px;
+    border-radius: 6px;
+    background: var(--surface2);
+    margin-bottom: 4px;
+    font-size: 12px;
+  }
+  .file-icon { font-size: 16px; }
+  .file-info { flex: 1; overflow: hidden; }
+  .file-name { color: var(--text); font-family: 'JetBrains Mono', monospace; font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .file-meta { color: var(--text-muted); font-size: 10px; }
+  .file-remove { color: var(--text-dim); cursor: pointer; font-size: 14px; flex-shrink: 0; }
+  .file-remove:hover { color: var(--accent3); }
+
+  /* CMD DETAIL */
+  .cmd-detail {
+    flex: 1;
+    overflow-y: auto;
+    padding: 14px;
+  }
+  .cmd-detail::-webkit-scrollbar { width: 4px; }
+  .cmd-detail::-webkit-scrollbar-thumb { background: var(--surface3); border-radius: 2px; }
+  .detail-title { font-family: 'JetBrains Mono', monospace; font-size: 18px; font-weight: 700; color: var(--keyword); margin-bottom: 4px; }
+  .detail-category { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 10px; }
+  .detail-desc { font-size: 13px; line-height: 1.6; color: var(--text); margin-bottom: 14px; }
+  .detail-section { margin-bottom: 14px; }
+  .detail-section-title {
+    font-size: 10px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase;
+    color: var(--text-muted); margin-bottom: 8px; padding-bottom: 4px;
+    border-bottom: 1px solid var(--border);
+  }
+  .syntax-block {
+    background: var(--bg); border: 1px solid var(--border); border-radius: 6px;
+    padding: 10px 12px; font-family: 'JetBrains Mono', monospace; font-size: 12px;
+    line-height: 1.6; color: var(--text); position: relative; word-break: break-word;
+  }
+  .copy-btn {
+    position: absolute; top: 6px; right: 8px; font-size: 10px; padding: 2px 8px;
+    border-radius: 4px; background: var(--surface3); color: var(--text-muted);
+    cursor: pointer; border: none; font-family: 'Syne', sans-serif; font-weight: 600;
+    transition: all 0.15s;
+  }
+  .copy-btn:hover { background: var(--accent); color: #000; }
+  .insert-btn {
+    width: 100%; margin-top: 8px; padding: 7px; border-radius: 6px;
+    background: rgba(88,166,255,0.1); border: 1px solid rgba(88,166,255,0.3);
+    color: var(--accent); font-family: 'Syne', sans-serif; font-weight: 600;
+    font-size: 12px; cursor: pointer; transition: all 0.15s;
+  }
+  .insert-btn:hover { background: rgba(88,166,255,0.2); }
+  .option-row { display: flex; gap: 6px; margin-bottom: 6px; align-items: flex-start; }
+  .option-key { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--option); min-width: 90px; flex-shrink: 0; padding-top: 1px; }
+  .option-val { font-size: 12px; color: var(--text-muted); line-height: 1.4; }
+  .example-block {
+    background: var(--bg); border: 1px solid var(--border); border-left: 3px solid var(--accent2);
+    border-radius: 4px; padding: 8px 10px; font-family: 'JetBrains Mono', monospace;
+    font-size: 11px; color: var(--text); line-height: 1.7; white-space: pre; overflow-x: auto;
+  }
+  .no-select { text-align: center; padding: 40px 20px; color: var(--text-muted); font-size: 13px; }
+  .no-select .big { font-size: 40px; margin-bottom: 12px; }
+  .search-highlight { background: rgba(227,179,65,0.25); color: var(--accent4); border-radius: 2px; }
+
+  /* RUN BAR */
+  .run-bar {
+    background: var(--surface); border-top: 1px solid var(--border);
+    padding: 8px 14px; display: flex; align-items: center; gap: 8px; flex-shrink: 0;
+  }
+  .progress-bar { flex: 1; height: 4px; background: var(--surface3); border-radius: 2px; overflow: hidden; display: none; }
+  .progress-fill { height: 100%; background: linear-gradient(90deg, var(--accent), var(--accent2)); width: 0%; transition: width 0.3s; border-radius: 2px; }
+  .spinner { width: 14px; height: 14px; border: 2px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.8s linear infinite; display: none; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .empty-terminal { color: var(--text-muted); font-size: 12px; padding: 20px; text-align: center; font-family: 'JetBrains Mono', monospace; }
+  #search-results-count { font-size: 11px; color: var(--text-muted); padding: 4px 14px; border-bottom: 1px solid var(--border); font-family: 'JetBrains Mono', monospace; }
+
+  /* ── AI CHAT PANEL ─────────────────────────────────── */
+  .ai-panel {
+    display: none;
+    flex-direction: column;
+    flex: 1;
+    overflow: hidden;
+  }
+  .ai-panel.active { display: flex; }
+
+  .chat-messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .chat-messages::-webkit-scrollbar { width: 4px; }
+  .chat-messages::-webkit-scrollbar-thumb { background: var(--surface3); border-radius: 2px; }
+
+  .chat-msg { display: flex; gap: 8px; }
+  .chat-msg.user { flex-direction: row-reverse; }
+  .avatar {
+    width: 26px; height: 26px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11px; font-weight: 700; flex-shrink: 0; margin-top: 2px;
+  }
+  .avatar-u { background: var(--accent);  color: #000; }
+  .avatar-a { background: var(--accent2); color: #000; }
+  .bubble {
+    max-width: 96%; padding: 8px 11px; border-radius: 8px;
+    font-size: 12px; line-height: 1.55; overflow-x: auto;
+  }
+  .bubble-u { background: rgba(88,166,255,.12); border: 1px solid rgba(88,166,255,.25); }
+  .bubble-a { background: var(--surface2); border: 1px solid var(--border); }
+  .bubble code {
+    font-family: 'JetBrains Mono', monospace; font-size: 11px;
+    background: rgba(255,255,255,.06); padding: 0 3px; border-radius: 3px;
+  }
+  .bubble pre {
+    background: var(--bg); border: 1px solid var(--border); border-radius: 5px;
+    padding: 8px 10px; margin-top: 6px; overflow-x: auto;
+    font-family: 'JetBrains Mono', monospace; font-size: 11px; line-height: 1.6;
+  }
+
+  /* tool call accordion */
+  .tool-acc {
+    margin-top: 6px; border: 1px solid var(--border); border-radius: 6px; overflow: hidden;
+  }
+  .tool-acc-hdr {
+    padding: 5px 10px; background: var(--surface3); display: flex;
+    align-items: center; gap: 6px; cursor: pointer; user-select: none;
+    font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--text-muted);
+  }
+  .tool-acc-hdr:hover { background: var(--surface2); }
+  .tool-acc-body {
+    background: var(--bg); padding: 8px 10px; display: none;
+    font-family: 'JetBrains Mono', monospace; font-size: 11px;
+    line-height: 1.6; color: var(--text); max-height: 220px; overflow-y: auto;
+    white-space: pre-wrap; word-break: break-word;
+  }
+  .tool-acc-body.open { display: block; }
+  .tool-tag {
+    display: inline-block; font-size: 9px; padding: 1px 6px; border-radius: 3px;
+    font-weight: 700; background: rgba(63,185,80,.15); color: var(--accent2);
+  }
+
+  /* Quick-prompt chips */
+  .chip-row { display: flex; flex-wrap: wrap; gap: 5px; padding: 8px 12px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+  .chip {
+    padding: 3px 9px; border-radius: 20px; font-size: 10px; font-weight: 600;
+    cursor: pointer; border: 1px solid var(--border); color: var(--text-muted);
+    background: transparent; transition: all 0.15s; font-family: 'Syne', sans-serif;
+  }
+  .chip:hover { border-color: var(--accent); color: var(--accent); }
+
+  /* AI chat input */
+  .chat-input-bar {
+    background: var(--surface); border-top: 1px solid var(--border);
+    padding: 10px 12px; display: flex; gap: 8px; align-items: flex-end; flex-shrink: 0;
+  }
+  .chat-input-wrap { flex: 1; }
+  #chatInput {
+    width: 100%; background: var(--bg); border: 1px solid var(--border);
+    border-radius: 8px; padding: 8px 10px; color: var(--text);
+    font-family: 'Syne', sans-serif; font-size: 12px; resize: none;
+    outline: none; line-height: 1.5; max-height: 100px;
+  }
+  #chatInput:focus { border-color: var(--accent); }
+  .chat-send-btn {
+    padding: 8px 14px; background: var(--accent2); color: #000;
+    border: none; border-radius: 6px; font-family: 'Syne', sans-serif;
+    font-weight: 700; font-size: 12px; cursor: pointer; transition: all 0.15s;
+    flex-shrink: 0;
+  }
+  .chat-send-btn:hover { background: #56d364; }
+  .chat-send-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  /* AI thinking indicator */
+  .thinking { display: flex; gap: 4px; align-items: center; padding: 6px 2px; }
+  .thinking span {
+    width: 6px; height: 6px; border-radius: 50%; background: var(--text-muted);
+    animation: bounce 1.2s infinite;
+  }
+  .thinking span:nth-child(2) { animation-delay: 0.2s; }
+  .thinking span:nth-child(3) { animation-delay: 0.4s; }
+  @keyframes bounce { 0%,60%,100%{transform:translateY(0)} 30%{transform:translateY(-6px)} }
+
+  /* ── OUTPUT FILES PANEL ──────────────────────────── */
+  .outfiles-panel {
+    display: none; flex-direction: column; flex: 1; overflow: hidden;
+  }
+  .outfiles-panel.active { display: flex; }
+  .outfiles-list { overflow-y: auto; padding: 8px; flex: 1; min-height: 40px; }
+  .outfile-item {
+    display: flex; align-items: center; gap: 8px; padding: 7px 10px;
+    border-radius: 6px; cursor: pointer; transition: background 0.1s;
+    margin-bottom: 2px;
+  }
+  .outfile-item:hover { background: var(--surface2); }
+  .outfile-item.sel { background: var(--surface2); border-left: 2px solid var(--accent2); }
+  .outfile-name { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--text); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .outfile-size { font-size: 10px; color: var(--text-muted); flex-shrink: 0; }
+  .outfile-viewer {
+    flex-shrink: 0; height: 220px; min-height: 60px;
+    display: flex; flex-direction: column; overflow: hidden; background: var(--bg);
+  }
+  .outfile-content {
+    flex: 1; overflow: auto;
+  }
+  .outfile-viewer-hdr {
+    padding: 6px 12px; background: var(--surface); border-bottom: 1px solid var(--border);
+    font-size: 10px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase;
+    color: var(--text-muted); display: flex; align-items: center; justify-content: space-between;
+  }
+  .outfile-content {
+    padding: 10px 12px; font-family: 'JetBrains Mono', monospace; font-size: 11px;
+    line-height: 1.7; color: var(--text); white-space: pre; overflow-x: auto;
+    flex: 1; overflow: auto;
+  }
+
+  /* ── SETTINGS MODAL ───────────────────────────────── */
+  .modal-overlay {
+    display: none; position: fixed; inset: 0; background: rgba(0,0,0,.7);
+    z-index: 9999; align-items: center; justify-content: center;
+  }
+  .modal-overlay.open { display: flex; }
+  .modal {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+    padding: 24px; width: 380px; max-width: 90vw;
+  }
+  .modal h2 { font-size: 16px; font-weight: 700; margin-bottom: 16px; color: var(--text); }
+  .modal label { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: .08em; display: block; margin-bottom: 6px; }
+  .modal input {
+    width: 100%; background: var(--bg); border: 1px solid var(--border); border-radius: 6px;
+    padding: 9px 12px; color: var(--text); font-family: 'JetBrains Mono', monospace;
+    font-size: 13px; outline: none; margin-bottom: 14px;
+  }
+  .modal input:focus { border-color: var(--accent); }
+  .modal-btns { display: flex; gap: 8px; justify-content: flex-end; margin-top: 4px; }
+  .modal-note { font-size: 11px; color: var(--text-muted); line-height: 1.5; margin-bottom: 14px; }
+</style>
+</head>
+<body>
+
+<!-- SETTINGS MODAL -->
+<div class="modal-overlay" id="settingsModal">
+  <div class="modal" style="min-width:420px;max-width:520px">
+    <h2>⚙ Settings — LLM Provider</h2>
+    <div class="modal-note">Choose your AI provider. Keys are sent only to the local server and never stored on disk.</div>
+
+    <label>Provider</label>
+    <select id="providerSelect" class="viewer-select" style="width:100%;margin-bottom:12px;padding:6px 10px;font-size:12px" onchange="onProviderChange()">
+      <option value="claude">Anthropic Claude</option>
+      <option value="openai">OpenAI (GPT)</option>
+      <option value="gemini">Google Gemini</option>
+    </select>
+
+    <label>Model</label>
+    <select id="modelSelect" class="viewer-select" style="width:100%;margin-bottom:12px;padding:6px 10px;font-size:12px"></select>
+
+    <label id="apiKeyLabel">API Key</label>
+    <input type="password" id="apiKeyInput" placeholder="Enter API key…" style="margin-bottom:12px">
+
+    <div class="modal-note" id="providerHint" style="background:rgba(88,166,255,0.07);border:1px solid var(--border);border-radius:6px;padding:8px 10px;margin-bottom:12px"></div>
+
+    <div class="modal-btns">
+      <button class="btn btn-ghost" onclick="closeSettings()">Cancel</button>
+      <button class="btn btn-primary" onclick="saveSettings()">Apply</button>
+    </div>
+  </div>
+</div>
+
+<!-- HEADER -->
+<header>
+  <div class="logo">
+    <span class="logo-icon">⬡</span>
+    <div class="logo-text">cpptraj <span>IDE</span></div>
+  </div>
+  <div class="header-search">
+    <span class="search-icon">⌕</span>
+    <input type="text" id="globalSearch" placeholder="Search commands… (e.g. rmsd, cluster, hbond)" oninput="filterCommands(this.value)">
+  </div>
+  <div class="status-pills" id="statusPills">
+    <div class="spill"><span class="sdot" id="dot-cpptraj"></span><span id="lbl-cpptraj">cpptraj</span></div>
+    <div class="spill"><span class="sdot" id="dot-parm"></span><span id="lbl-parm">no topology</span></div>
+    <div class="spill"><span class="sdot" id="dot-api"></span><span id="lbl-api">no API key</span></div>
+  </div>
+  <div class="header-right">
+    <button class="btn btn-ghost" onclick="clearEditor()">Clear</button>
+    <button class="btn btn-ghost" onclick="loadTemplate()">Templates</button>
+    <button class="btn btn-ghost" onclick="openSettings()">⚙</button>
+    <button class="btn btn-success" onclick="runAnalysis()">▶ Run Analysis</button>
+  </div>
+</header>
+
+<div class="main">
+
+  <!-- LEFT: Command Reference -->
+  <div class="panel-left">
+    <div class="panel-header">
+      Command Reference
+      <span id="cmd-count" style="color:var(--accent);font-size:10px"></span>
+    </div>
+    <div class="filter-tabs">
+      <button class="filter-tab active" onclick="setFilter('all', this)">All</button>
+      <button class="filter-tab" onclick="setFilter('input', this)">Input</button>
+      <button class="filter-tab" onclick="setFilter('analysis', this)">Analysis</button>
+      <button class="filter-tab" onclick="setFilter('action', this)">Action</button>
+      <button class="filter-tab" onclick="setFilter('output', this)">Output</button>
+    </div>
+    <div id="search-results-count"></div>
+    <div class="cmd-list" id="cmdList"></div>
+  </div>
+
+  <div class="divider" id="divL"></div>
+
+  <!-- CENTER: Editor + Terminal -->
+  <div class="panel-center">
+    <div class="editor-toolbar">
+      <div class="file-tabs">
+        <div class="file-tab active">
+          <span class="file-tab-dot"></span>
+          analysis.cpptraj
+        </div>
+      </div>
+      <button class="btn btn-ghost" style="font-size:11px" onclick="downloadScript()">⬇ Save</button>
+    </div>
+    <div class="editor-area">
+      <div class="editor-wrapper">
+        <div class="line-numbers" id="lineNumbers"></div>
+        <textarea id="editor" spellcheck="false"
+          oninput="updateLineNumbers()" onscroll="syncScroll()"
+          placeholder="# cpptraj script
+# Use the command reference on the left to build your analysis
+# Click any command to see its syntax, then click 'Insert' to add it here
+"></textarea>
+      </div>
+    </div>
+    <div class="editor-status">
+      <div class="status-item"><span class="status-dot"></span> Ready</div>
+      <div class="status-item" id="cursorPos">Ln 1, Col 1</div>
+      <div class="status-item" id="lineCount">0 lines</div>
+      <div class="status-item" style="color:var(--accent);font-family:JetBrains Mono,monospace;font-size:10px">CPPTRAJ SCRIPT</div>
+    </div>
+    <div class="run-bar">
+      <button class="btn btn-success" style="font-size:12px" onclick="runAnalysis()">▶ Run</button>
+      <div class="progress-bar" id="progressBar"><div class="progress-fill" id="progressFill"></div></div>
+      <div class="spinner" id="spinner"></div>
+      <span id="runStatus" style="font-size:12px;color:var(--text-muted);font-family:JetBrains Mono,monospace"></span>
+      <button class="btn btn-ghost" style="font-size:11px;margin-left:auto" onclick="clearTerminal()">Clear Output</button>
+    </div>
+    <div class="h-divider" id="divH"></div>
+    <div class="terminal">
+      <div class="terminal-header">
+        Output Terminal
+        <span id="termStatus" style="color:var(--accent2)">●  IDLE</span>
+      </div>
+      <div class="terminal-body" id="termBody">
+        <span class="t-line t-info">cpptraj IDE — Molecular Dynamics Analysis Studio</span>
+        <span class="t-line t-info">Upload topology + trajectory files, write your script, click ▶ Run.</span>
+        <span class="t-line t-info">Use ⚙ in the header to set your Anthropic API key for the AI Agent.</span>
+        <span class="t-line t-info">─────────────────────────────────────────────────────────</span>
+        <span class="t-line t-prompt">$  </span>
+      </div>
+    </div>
+  </div>
+
+  <div class="divider" id="divR"></div>
+
+  <!-- RIGHT: Files / Command Detail / AI Agent / Output Files -->
+  <div class="panel-right">
+
+    <!-- Mode tabs -->
+    <div class="right-tabs">
+      <button class="rtab active" onclick="setRightTab('files',  this)" id="rtab-files">Files</button>
+      <button class="rtab"        onclick="setRightTab('detail', this)" id="rtab-detail">Detail</button>
+      <button class="rtab"        onclick="setRightTab('ai',     this)" id="rtab-ai">✦ AI Agent</button>
+      <button class="rtab"        onclick="setRightTab('output', this)" id="rtab-output">Output</button>
+      <button class="rtab"        onclick="setRightTab('viewer', this)" id="rtab-viewer">⬡ Viewer</button>
+    </div>
+
+    <!-- FILES tab -->
+    <div id="tab-files" class="right-tab-content" style="display:flex;flex-direction:column;overflow:hidden;">
+      <div class="files-section">
+        <div class="panel-header" style="border-bottom:none">Project Files</div>
+        <div class="upload-zone" id="uploadZone">
+          <input type="file" id="fileInput" multiple
+            accept=".prmtop,.parm7,.nc,.trj,.dcd,.xtc,.mdcrd,.pdb,.rst7,.inpcrd,.psf,.gro"
+            onchange="handleFiles(this.files)">
+          <div class="upload-icon">📂</div>
+          <div class="upload-text">Drop <strong>topology</strong> (.prmtop) &amp;<br><strong>trajectory</strong> (.nc, .dcd, .xtc) here</div>
+        </div>
+        <div class="file-list" id="fileList"></div>
+      </div>
+      <!-- Mask cheat-sheet -->
+      <!-- TEST DATA -->
+      <div class="panel-header" style="border-top:1px solid var(--border)">
+        Test Data
+        <span style="color:var(--accent2);font-size:9px">ready to use</span>
+      </div>
+      <div style="padding:8px 10px;border-bottom:1px solid var(--border)">
+        <div style="font-size:11px;color:var(--text-muted);margin-bottom:8px;line-height:1.5">
+          Solvated protein · 30070 atoms · 9157 res · 10 frames · AMBER NetCDF
+        </div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
+          <button class="btn btn-ghost" style="font-size:10px;padding:4px 10px" onclick="loadTestTopology()">⬇ Topology (.prmtop)</button>
+          <button class="btn btn-ghost" style="font-size:10px;padding:4px 10px" onclick="loadTestTrajectory()">⬇ Trajectory (.nc)</button>
+          <button class="btn btn-primary" style="font-size:10px;padding:4px 10px;margin-top:4px;width:100%" onclick="loadTestScript()">⊕ Load example script</button>
+        </div>
+      </div>
+
+      <div class="panel-header" style="border-top:1px solid var(--border)">Mask Cheat Sheet</div>
+      <div style="padding:10px 14px;font-size:11px;overflow-y:auto;flex:1">
+        <div style="display:grid;grid-template-columns:90px 1fr;row-gap:6px;column-gap:8px">
+          <code style="color:var(--option)">:1</code><span style="color:var(--text-muted)">Residue 1</span>
+          <code style="color:var(--option)">:1-100</code><span style="color:var(--text-muted)">Residues 1–100</span>
+          <code style="color:var(--option)">:ALA</code><span style="color:var(--text-muted)">All alanines</span>
+          <code style="color:var(--option)">@CA</code><span style="color:var(--text-muted)">All Cα atoms</span>
+          <code style="color:var(--option)">@CA,C,N,O</code><span style="color:var(--text-muted)">Backbone atoms</span>
+          <code style="color:var(--option)">!:WAT</code><span style="color:var(--text-muted)">Exclude water</span>
+          <code style="color:var(--option)">:1-50&@CA</code><span style="color:var(--text-muted)">Cα of res 1–50</span>
+          <code style="color:var(--option)">:LIG&lt;:5.0</code><span style="color:var(--text-muted)">Within 5 Å of LIG</span>
+          <code style="color:var(--option)">@/C</code><span style="color:var(--text-muted)">All carbons</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- DETAIL tab -->
+    <div id="tab-detail" class="right-tab-content" style="display:none;flex-direction:column;overflow:hidden;flex:1">
+      <div class="cmd-detail" id="cmdDetail">
+        <div class="no-select">
+          <div class="big">⬡</div>
+          <div>Click a command in the<br>reference panel to see its<br>syntax and options</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- AI AGENT tab -->
+    <div id="tab-ai" class="right-tab-content ai-panel" style="display:none">
+      <div class="chip-row" id="chipRow"></div>
+      <div class="chat-messages" id="chatMessages">
+        <div class="no-select" style="padding:30px 10px">
+          <div class="big">✦</div>
+          <div style="font-size:12px">Describe your analysis in plain<br>English. The agent writes and<br>runs the cpptraj script for you.</div>
+        </div>
+      </div>
+      <div class="chat-input-bar">
+        <div class="chat-input-wrap">
+          <textarea id="chatInput" rows="2"
+            placeholder="e.g. Calculate backbone RMSD vs first frame…"
+            onkeydown="chatKeydown(event)"></textarea>
+        </div>
+        <button class="chat-send-btn" id="chatSendBtn" onclick="sendChat()">Send</button>
+      </div>
+      <div style="background:var(--surface);border-top:1px solid var(--border);padding:6px 12px;display:flex;gap:6px;flex-shrink:0">
+        <button class="btn btn-ghost" style="font-size:10px;padding:3px 10px" onclick="resetChat()">Clear chat</button>
+        <span id="activeModelBadge" style="font-size:10px;color:var(--text-dim);margin-left:auto;display:flex;align-items:center;font-family:JetBrains Mono,monospace">— · RAG</span>
+      </div>
+    </div>
+
+    <!-- OUTPUT FILES tab -->
+    <div id="tab-output" class="right-tab-content outfiles-panel" style="display:none">
+      <div style="padding:8px 12px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-shrink:0">
+        <span style="font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--text-muted)">Output Files</span>
+        <button class="btn btn-ghost" style="font-size:10px;padding:3px 10px" onclick="refreshOutputFiles()">⟳ Refresh</button>
+      </div>
+      <div class="outfiles-list" id="outfilesList">
+        <div class="no-select" style="padding:20px 10px">
+          <div style="font-size:28px;margin-bottom:8px">📊</div>
+          <div style="font-size:12px">No output files yet.<br>Run an analysis first.</div>
+        </div>
+      </div>
+      <div class="h-divider" id="divOutH" style="display:none"></div>
+      <div class="outfile-viewer" id="outfileViewer" style="display:none">
+        <div class="outfile-viewer-hdr">
+          <span id="outfileViewerName"></span>
+          <button class="btn btn-ghost" style="font-size:10px;padding:2px 8px" id="outfileDlBtn">⬇ Download</button>
+        </div>
+        <div class="outfile-content" id="outfileViewerContent"></div>
+      </div>
+    </div>
+
+    <!-- VIEWER tab -->
+    <div id="tab-viewer" class="right-tab-content viewer-panel" style="display:none">
+      <div id="ngl-stage">
+        <div class="viewer-empty" id="viewerEmpty">
+          <div style="font-size:32px">⬡</div>
+          <div>Load topology + trajectory,<br>then click <strong style="color:var(--accent)">Load into Viewer</strong></div>
+        </div>
+      </div>
+      <div class="viewer-controls">
+        <!-- Row 1: load + representation -->
+        <div class="viewer-row">
+          <button class="btn btn-primary" style="font-size:11px;padding:4px 12px" onclick="loadIntoViewer()" id="loadViewerBtn">⬡ Load into Viewer</button>
+          <select class="viewer-select" id="reprSelect" onchange="changeRepr()">
+            <option value="cartoon">Cartoon</option>
+            <option value="ball+stick">Ball+Stick</option>
+            <option value="licorice">Licorice</option>
+            <option value="backbone">Backbone</option>
+            <option value="surface">Surface</option>
+            <option value="ribbon">Ribbon</option>
+            <option value="rope">Rope</option>
+            <option value="line">Line</option>
+          </select>
+          <select class="viewer-select" id="colorSelect" onchange="changeRepr()">
+            <option value="chainname">Chain</option>
+            <option value="residueindex">Residue</option>
+            <option value="element">Element</option>
+            <option value="bfactor">B-factor</option>
+            <option value="sstruc">SS</option>
+          </select>
+          <button class="btn btn-ghost" style="font-size:11px;padding:4px 8px" onclick="viewerCenter()" title="Reset view">⊙</button>
+          <button class="btn btn-ghost" style="font-size:11px;padding:4px 8px" onclick="viewerSpin()" id="spinBtn" title="Toggle spin">↻</button>
+        </div>
+        <!-- Row 2: frame scrubber -->
+        <div class="viewer-row">
+          <button class="btn btn-ghost" style="font-size:11px;padding:3px 10px;min-width:72px" onclick="viewerTogglePlay()" id="playBtn">▶ Play</button>
+          <input type="range" class="viewer-slider" id="frameSlider" min="0" value="0" oninput="viewerSetFrame(+this.value)">
+          <span class="viewer-frame" id="frameCounter">— / —</span>
+        </div>
+        <!-- Row 3: speed -->
+        <div class="viewer-row">
+          <span class="viewer-label">Speed</span>
+          <input type="range" class="viewer-slider" id="speedSlider" min="20" max="500" value="100" style="max-width:100px" oninput="viewerSetSpeed(+this.value)">
+          <span class="viewer-label" id="speedLabel">100 ms/frame</span>
+          <button class="btn btn-ghost" style="font-size:10px;padding:2px 8px;margin-left:auto" onclick="viewerScreenshot()">📷</button>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /panel-right -->
+</div><!-- /main -->
+
+<script>
+// ─────────────────────────────────────────────────────────────────────────────
+// DATA
+// ─────────────────────────────────────────────────────────────────────────────
+const COMMANDS = [
+  { id:'parm',       name:'parm',       category:'input',    desc:'Load topology/parameter file', syntax:'parm <filename> [<tag>] [nobondsearch]', options:[['<filename>','Topology file (.prmtop, .pdb, .psf, .gro)'],['<tag>','Optional label for this topology'],['nobondsearch','Disable automatic bond searching']], example:`parm protein.prmtop\nparm system.pdb [sys]`, notes:'Must be first command. Supports AMBER .prmtop, CHARMM .psf, GROMACS .gro, PDB.' },
+  { id:'trajin',     name:'trajin',     category:'input',    desc:'Load trajectory file(s)', syntax:'trajin <filename> [start] [stop|last] [offset]', options:[['<filename>','Trajectory file (.nc, .dcd, .xtc, .trr, .mdcrd)'],['start','First frame (default: 1)'],['stop','Last frame (default: last)'],['offset','Step between frames (default: 1)']], example:`trajin traj.nc\ntrajin traj.nc 1 500 5`, notes:'Use start/stop/offset to sub-sample. Multiple trajin commands concatenate.' },
+  { id:'reference',  name:'reference',  category:'input',    desc:'Load reference structure', syntax:'reference <filename> [<frame>] [<tag>]', options:[['<filename>','Reference file (.pdb, .rst7, .nc)'],['<frame>','Which frame to use (default: 1)'],['<tag>','Label, e.g. [native]']], example:`reference native.pdb [native]`, notes:'Used by rmsd, align, and nativecontacts.' },
+  { id:'trajout',    name:'trajout',    category:'output',   desc:'Write processed trajectory', syntax:'trajout <filename> [format] [nobox]', options:[['<filename>','Output trajectory path'],['format','amber|dcd|xtc|pdb (auto-detected)'],['nobox','Strip box information']], example:`trajout output.nc\ntrajout stripped.dcd dcd`, notes:'Format auto-detected from extension.' },
+  { id:'autoimage',  name:'autoimage',  category:'action',   desc:'Fix periodic boundary imaging', syntax:'autoimage [familiar] [byres|bymol] [anchor <mask>]', options:[['familiar','Reassemble split molecules'],['byres','Image by residue'],['bymol','Image by molecule (default)'],['anchor <mask>','Keep group fixed']], example:`autoimage\nautoimage familiar`, notes:'Run before any analysis on PBC trajectories.' },
+  { id:'center',     name:'center',     category:'action',   desc:'Center system coordinates', syntax:'center [<mask>] [origin] [mass]', options:[['<mask>','Group to center (default: all)'],['origin','Center at (0,0,0)'],['mass','Use center of mass']], example:`center !:WAT origin\ncenter @CA mass origin`, notes:'Apply before autoimage for best results.' },
+  { id:'strip',      name:'strip',      category:'action',   desc:'Remove atoms from trajectory', syntax:'strip <mask>', options:[['<mask>','Atoms to remove (e.g. :WAT, :Na+)']], example:`strip :WAT\nstrip :WAT,Na+,Cl-`, notes:'Use ! to keep only the mask atoms. Modifies in memory.' },
+  { id:'align',      name:'align',      category:'action',   desc:'Align trajectory to reference', syntax:'align [<mask>] [ref <tag>|reference|first] [mass]', options:[['<mask>','Atoms for alignment'],['ref <tag>','Named reference'],['mass','Mass-weighted']], example:`align @CA reference\nalign :1-100@CA ref [native]`, notes:'Modifies coordinates in memory. Different from rmsd.' },
+  { id:'rmsd',       name:'rmsd',       category:'analysis', desc:'Calculate RMSD vs reference', syntax:'rmsd [<name>] [<mask>] [ref <tag>|reference|first] [out <file>] [mass] [nofit] [perres]', options:[['<name>','Dataset name'],['<mask>','Atom selection (e.g. @CA,C,N,O)'],['first','Use first frame as reference'],['reference','Use loaded reference'],['ref <tag>','Named reference'],['out <file>','Output file'],['mass','Mass-weighted'],['nofit','Skip fitting'],['perres','Per-residue RMSD'],['perresout','Per-residue output file']], example:`rmsd backbone @CA,C,N,O first out rmsd.dat\nrmsd ca_rmsd @CA ref [native] out rmsd.dat`, notes:'Most common MD analysis. Use @CA,C,N,O for backbone.' },
+  { id:'atomicfluct',name:'atomicfluct',category:'analysis', desc:'Per-atom/residue RMSF', syntax:'atomicfluct [<name>] [<mask>] [out <file>] [byres] [byatom]', options:[['<mask>','Atom selection'],['byres','Per-residue RMSF'],['byatom','Per-atom (default)'],['out <file>','Output file'],['bfactor','Output as B-factors']], example:`atomicfluct rmsf @CA byres out rmsf.dat`, notes:'Multiply RMSF × 8π²/3 to get crystallographic B-factors.' },
+  { id:'radgyr',     name:'radgyr',     category:'analysis', desc:'Radius of gyration', syntax:'radgyr [<name>] [<mask>] [out <file>] [mass] [tensor]', options:[['<mask>','Atom selection'],['mass','Mass-weighted (recommended)'],['out <file>','Output file'],['tensor','Output gyration tensor']], example:`radgyr rg !:WAT mass out rg.dat`, notes:'Measures compactness. Always use mass keyword.' },
+  { id:'hbond',      name:'hbond',      category:'analysis', desc:'Hydrogen bond analysis', syntax:'hbond [<name>] [<mask>] [out <file>] [avgout <file>] [dist <A>] [angle <deg>] [series]', options:[['<mask>','H-bond search mask'],['donormask','Specify donor atoms'],['acceptormask','Specify acceptor atoms'],['dist','Distance cutoff Å (default: 3.5)'],['angle','Angle cutoff ° (default: 135)'],['out','H-bond count per frame'],['avgout','Average statistics file'],['series','Per-H-bond time series']], example:`hbond hbonds !:WAT out hbond.dat avgout hbond_avg.dat`, notes:'Default: D-A distance ≤ 3.5 Å, D-H-A angle ≥ 135°.' },
+  { id:'secstruct',  name:'secstruct',  category:'analysis', desc:'Secondary structure (DSSP)', syntax:'secstruct [<name>] [<mask>] [out <file>] [sumout <file>]', options:[['<mask>','Residue selection'],['out','Per-frame SS assignment'],['sumout','Summary statistics']], example:`secstruct ss out ss.dat sumout ss_sum.dat`, notes:'DSSP algorithm. H=α-helix, E=β-strand, T=turn, C=coil.' },
+  { id:'cluster',    name:'cluster',    category:'analysis', desc:'Cluster trajectory frames', syntax:'cluster [<name>] [<mask>] [hieragglo|kmeans|dbscan] [epsilon <val>] [clusters <N>] [out <file>] [summary <file>] [repout <prefix>] [repfmt pdb]', options:[['<mask>','Atom mask for clustering'],['hieragglo','Hierarchical agglomerative'],['kmeans clusters N','K-means with N clusters'],['dbscan minpoints N epsilon E','DBSCAN'],['epsilon','Cutoff distance Å'],['sieve N','Use 1 of every N frames'],['out','Cluster assignment'],['summary','Statistics file'],['repout','Representative structure prefix']], example:`cluster clusters @CA hieragglo epsilon 2.0 sieve 10 out clust.dat summary sum.dat repout rep repfmt pdb`, notes:'Use sieve for large trajectories.' },
+  { id:'distance',   name:'distance',   category:'analysis', desc:'Distance between two masks', syntax:'distance [<name>] <mask1> <mask2> [out <file>] [noimage] [geom]', options:[['<mask1>','First atom/group'],['<mask2>','Second atom/group'],['out','Output file'],['geom','Use geometric center']], example:`distance dist :1@CA :100@CA out dist.dat`, notes:'Center-of-mass distance by default.' },
+  { id:'angle',      name:'angle',      category:'analysis', desc:'Angle between three atoms', syntax:'angle [<name>] <mask1> <mask2> <mask3> [out <file>]', options:[['<mask1-3>','Three atoms (mask2 is vertex)'],['out','Output file']], example:`angle a1 :1@N :1@CA :1@C out angle.dat`, notes:'mask2 is the vertex atom. Output in degrees.' },
+  { id:'dihedral',   name:'dihedral',   category:'analysis', desc:'Dihedral (torsion) angle', syntax:'dihedral [<name>] <mask1> <mask2> <mask3> <mask4> [out <file>]', options:[['<mask1-4>','Four atoms defining the dihedral'],['out','Output file']], example:`dihedral phi :4@C :5@N :5@CA :5@C out phi.dat`, notes:'Output range: −180 to +180 degrees.' },
+  { id:'surf',       name:'surf',       category:'analysis', desc:'Solvent accessible surface area', syntax:'surf [<name>] [<mask>] [out <file>] [solvradius <val>]', options:[['<mask>','Atoms for SASA'],['out','Output file'],['solvradius','Probe radius Å (default: 1.4)']], example:`surf sasa !:WAT out sasa.dat`, notes:'LCPO algorithm. 1.4 Å probe simulates water.' },
+  { id:'nativecontacts', name:'nativecontacts', category:'analysis', desc:'Native contacts (Q-value)', syntax:'nativecontacts [<name>] [<mask>] [ref <tag>|reference] [out <file>] [distance <cutoff>]', options:[['<mask>','Atom mask'],['ref','Reference structure'],['distance','Contact cutoff Å (default: 7.0)'],['out','Output file']], example:`reference native.pdb [native]\nnativecontacts nc !:WAT&!@H= ref [native] out nc.dat distance 7.0`, notes:'Q-value measures fraction of reference contacts that are formed.' },
+  { id:'watershell', name:'watershell', category:'analysis', desc:'Solvation shell water count', syntax:'watershell [<name>] <solute_mask> [out <file>] [lower <A>] [upper <A>]', options:[['<solute_mask>','Solute atoms'],['lower','First shell cutoff Å (default: 3.4)'],['upper','Second shell cutoff Å (default: 5.0)'],['out','Output file']], example:`watershell :1-200 out wshell.dat lower 3.4 upper 5.0`, notes:'Reports water count in first and second solvation shells.' },
+  { id:'diffusion',  name:'diffusion',  category:'analysis', desc:'MSD and diffusion coefficient', syntax:'diffusion [<name>] [<mask>] [out <file>] [time <dt>] [diffout <file>]', options:[['<mask>','Atom selection'],['out','MSD vs time file'],['time','Time per frame in ps'],['diffout','Diffusion coefficient output']], example:`diffusion :WAT out msd.dat time 0.002 diffout diff.dat`, notes:'D = slope of MSD / 6. Output in cm²/s.' },
+  { id:'go',         name:'go',         category:'action',   desc:'Execute all queued commands', syntax:'go', options:[], example:`go`, notes:'Required at end of every script.' },
+    { id:'activeref', name:'activeref', category:'input', desc:`Set the active reference structure`, syntax:`activeref <tag>`, options:[], example:``, notes:`` },
+    { id:'addatom', name:'addatom', category:'action', desc:`Add atoms to the topology`, syntax:`addatom {bond <mask> | nobond} <name> <type> <charge> <mass> [<coords>]`, options:[], example:``, notes:`` },
+    { id:'areapermol', name:'areapermol', category:'analysis', desc:`Calculate area per molecule (lipid bilayer)`, syntax:`areapermol [<name>] [out <file>] [<mask>] [frame]`, options:[], example:``, notes:`` },
+    { id:'atomiccorr', name:'atomiccorr', category:'analysis', desc:`Atomic correlation matrix between atom displacements`, syntax:`atomiccorr [out <file>] [cut <cut>] [<mask>] [datasave <set>]`, options:[], example:``, notes:`` },
+    { id:'atommap', name:'atommap', category:'action', desc:`Map atoms between two structures/topologies`, syntax:`atommap <ref> <target> [mapout <file>] [maponly]`, options:[], example:``, notes:`` },
+    { id:'autocorr', name:'autocorr', category:'analysis', desc:`Autocorrelation of a data set`, syntax:`autocorr <dataset> [out <file>] [lagmax <max>] [norm] [direct]`, options:[], example:``, notes:`` },
+    { id:'average', name:'average', category:'analysis', desc:`Compute average structure over trajectory`, syntax:`average [<name>] <filename> [<fmt>] [<mask>] [start <s>] [stop <e>] [offset <o>]`, options:[], example:``, notes:`` },
+    { id:'avgbox', name:'avgbox', category:'analysis', desc:`Compute average box dimensions`, syntax:`avgbox [<name>] [out <file>]`, options:[], example:``, notes:`` },
+    { id:'avgcoord', name:'avgcoord', category:'analysis', desc:`Average coordinates for each atom over trajectory`, syntax:`avgcoord [<name>] [<mask>] [out <file>]`, options:[], example:``, notes:`` },
+    { id:'bondparminfo', name:'bondparminfo', category:'action', desc:`Print bond parameter information`, syntax:`bondparminfo [<mask>] [<topology tag>]`, options:[], example:``, notes:`` },
+    { id:'bounds', name:'bounds', category:'analysis', desc:`Calculate bounding box around atoms`, syntax:`bounds [<name>] [<mask>] [out <file>] [dx <dx>] [offset <offset>]`, options:[], example:``, notes:`` },
+    { id:'box', name:'box', category:'action', desc:`Set or modify unit cell box dimensions`, syntax:`box [x <x>] [y <y>] [z <z>] [alpha <a>] [beta <b>] [gamma <g>] [nobox]`, options:[], example:``, notes:`` },
+    { id:'calcdiffusion', name:'calcdiffusion', category:'analysis', desc:`Calculate diffusion coefficient from MSD data`, syntax:`calcdiffusion <msd_set> [out <file>] [time <ts>]`, options:[], example:``, notes:`` },
+    { id:'calcstate', name:'calcstate', category:'analysis', desc:`Calculate state of system using HMM or thresholds`, syntax:`calcstate [name <name>] [out <file>] <state_args>`, options:[], example:``, notes:`` },
+    { id:'catcrd', name:'catcrd', category:'action', desc:`Concatenate COORDS data sets`, syntax:`catcrd [crdset <set1>] [crdset <set2>] ... name <output>`, options:[], example:``, notes:`` },
+    { id:'change', name:'change', category:'action', desc:`Change topology atom/residue properties`, syntax:`change {resname from <old> to <new> | atomname from <old> to <new> | ...}`, options:[], example:``, notes:`` },
+    { id:'charge', name:'charge', category:'action', desc:`Print total charge for atom selection`, syntax:`charge [<mask>]`, options:[], example:``, notes:`` },
+    { id:'checkchirality', name:'checkchirality', category:'action', desc:`Check chirality of chiral centers`, syntax:`checkchirality [<mask>] [out <file>]`, options:[], example:``, notes:`` },
+    { id:'checkoverlap', name:'checkoverlap', category:'analysis', desc:`Check for bad atomic overlaps/clashes`, syntax:`check [<mask>] [cut <cut>] [noimage] [out <file>]`, options:[], example:``, notes:`` },
+    { id:'closest', name:'closest', category:'action', desc:`Keep N closest solvent molecules to solute`, syntax:`closest <N> <solvent_mask> [noimage] [first|oxygen] [name <name>]`, options:[], example:``, notes:`` },
+    { id:'clusterdihedral', name:'clusterdihedral', category:'analysis', desc:`Cluster by dihedral angles`, syntax:`clusterdihedral [<mask>] [out <file>] [clusterout <prefix>] [...dihedrals...]`, options:[], example:``, notes:`` },
+    { id:'combinecrd', name:'combinecrd', category:'action', desc:`Combine two COORDS sets into one`, syntax:`combinecrd <crdset1> <crdset2> name <output>`, options:[], example:``, notes:`` },
+    { id:'comparetop', name:'comparetop', category:'action', desc:`Compare two topology files`, syntax:`comparetop [parm1 <tag>] [parm2 <tag>]`, options:[], example:``, notes:`` },
+    { id:'contacts', name:'contacts', category:'analysis', desc:`Calculate number of contacts (legacy; prefer nativecontacts)`, syntax:`contacts [first|reference|ref <ref>] [byresidue] [out <file>] [<mask>]`, options:[], example:``, notes:`` },
+    { id:'cphstats', name:'cphstats', category:'analysis', desc:`Analyze constant-pH simulation statistics`, syntax:`cphstats <cpin> {<cpout> [<cpout2> ...]} [out <file>] [deprot <file>]`, options:[], example:``, notes:`` },
+    { id:'crdaction', name:'crdaction', category:'action', desc:`Apply an action to a COORDS data set`, syntax:`crdaction <crdset> <action> [<action_args>]`, options:[], example:``, notes:`` },
+    { id:'crdfluct', name:'crdfluct', category:'action', desc:`Calculate fluctuations of a COORDS data set`, syntax:`crdfluct <crdset> [<mask>] [out <file>] [byres] [bfactor]`, options:[], example:``, notes:`` },
+    { id:'crdout', name:'crdout', category:'output', desc:`Write a COORDS data set to a trajectory file`, syntax:`crdout <crdset> <filename> [<fmt>] [<mask>]`, options:[], example:``, notes:`` },
+    { id:'crdtransform', name:'crdtransform', category:'action', desc:`Apply coordinate transformation to a COORDS set`, syntax:`crdtransform <crdset> [<xform_args>]`, options:[], example:``, notes:`` },
+    { id:'createcrd', name:'createcrd', category:'input', desc:`Create an empty COORDS data set`, syntax:`createcrd <name>`, options:[], example:``, notes:`` },
+    { id:'createreservoir', name:'createreservoir', category:'input', desc:`Create structure reservoir for REST simulation`, syntax:`createreservoir <name> <filename> [<fmt>] [<mask>] [ene <set>] [temp <T>]`, options:[], example:``, notes:`` },
+    { id:'createset', name:'createset', category:'input', desc:`Create a new data set with specified values`, syntax:`createset name <name> type <type> [values <v1>,<v2>,...] [<range>]`, options:[], example:``, notes:`` },
+    { id:'crosscorr', name:'crosscorr', category:'analysis', desc:`Cross-correlation between two data sets`, syntax:`crosscorr <set1> <set2> [out <file>] [lagmax <max>] [norm] [direct]`, options:[], example:``, notes:`` },
+    { id:'curvefit', name:'curvefit', category:'analysis', desc:`Fit data to a functional form`, syntax:`curvefit <function> <dataset> [out <file>] [results <file>] [nofit]`, options:[], example:``, notes:`` },
+    { id:'datafile', name:'datafile', category:'output', desc:`Set output options for a data file`, syntax:`datafile <filename> [<options>]`, options:[], example:``, notes:`` },
+    { id:'datafilter', name:'datafilter', category:'output', desc:`Filter data sets by criteria`, syntax:`datafilter <dataset> min <min> max <max> [out <file>]`, options:[], example:``, notes:`` },
+    { id:'dataset', name:'dataset', category:'output', desc:`Perform operations on data sets`, syntax:`dataset {legend <legend> <set> | makexy <X> <Y> name <out> | ...}`, options:[], example:``, notes:`` },
+    { id:'diagmatrix', name:'diagmatrix', category:'analysis', desc:`Diagonalize a matrix to get eigenvalues/vectors`, syntax:`diagmatrix <matrixset> [out <evecfile>] [vecs <N>] [reduce] [mass <mask>]`, options:[], example:``, notes:`` },
+    { id:'dihedralrms', name:'dihedralrms', category:'analysis', desc:`RMSD of dihedral angles between frames`, syntax:`dihedralrms [<mask>] [out <file>] [mass] [nofit]`, options:[], example:``, notes:`` },
+    { id:'dihedralscan', name:'dihedralscan', category:'action', desc:`Scan dihedral angles to generate conformations`, syntax:`dihedralscan [<mask>] [rseed <seed>] [out <file>] [outtraj <file>]`, options:[], example:``, notes:`` },
+    { id:'dipole', name:'dipole', category:'analysis', desc:`Calculate dipole moment of selection`, syntax:`dipole [<name>] [<mask>] [out <file>] [<grid_options>]`, options:[], example:``, notes:`` },
+    { id:'divergence', name:'divergence', category:'analysis', desc:`Calculate KL divergence between two distributions`, syntax:`divergence <set1> <set2> [out <file>]`, options:[], example:``, notes:`` },
+    { id:'dssp', name:'dssp', category:'analysis', desc:`DSSP secondary structure assignment (alias for secstruct)`, syntax:`dssp [<name>] [<mask>] [out <file>] [sumout <file>]`, options:[], example:``, notes:`` },
+    { id:'emin', name:'emin', category:'action', desc:`Energy minimization using internal force field`, syntax:`emin [<mask>] [nstep <N>] [out <file>] [step <step>]`, options:[], example:``, notes:`` },
+    { id:'enedecomp', name:'enedecomp', category:'analysis', desc:`Energy decomposition per residue`, syntax:`enedecomp [<mask>] [out <file>] [cut <cut>]`, options:[], example:``, notes:`` },
+    { id:'energy', name:'energy', category:'analysis', desc:`Calculate energy using internal force field`, syntax:`energy [<mask>] [out <file>] [bond] [angle] [dih] [vdw] [elec]`, options:[], example:``, notes:`` },
+    { id:'esander', name:'esander', category:'analysis', desc:`Calculate energy using sander (AMBER engine)`, syntax:`esander [<mask>] [out <file>] [igb <igb>] [cut <cut>]`, options:[], example:``, notes:`` },
+    { id:'fft', name:'fft', category:'analysis', desc:`Fast Fourier Transform of a data set`, syntax:`fft <dataset> [out <file>] [dt <timestep>] [fftout <file>]`, options:[], example:``, notes:`` },
+    { id:'filter', name:'filter', category:'analysis', desc:`Filter frames based on dataset value criteria`, syntax:`filter <dataset> min <min> max <max>`, options:[], example:``, notes:`` },
+    { id:'fixatomorder', name:'fixatomorder', category:'action', desc:`Reorder atoms to match topology`, syntax:`fixatomorder [<mask>] [outprefix <prefix>]`, options:[], example:``, notes:`` },
+    { id:'fiximagedbonds', name:'fiximagedbonds', category:'action', desc:`Fix broken bonds across periodic boundaries`, syntax:`fiximagedbonds [<mask>]`, options:[], example:``, notes:`` },
+    { id:'flatten', name:'flatten', category:'output', desc:`Flatten multi-dimensional data sets to 1D`, syntax:`flatten <dataset> [out <file>]`, options:[], example:``, notes:`` },
+    { id:'graft', name:'graft', category:'action', desc:`Graft coordinates from one structure onto another`, syntax:`graft [src <mask>] [tgt <mask>] [srcframe <N>] [mass]`, options:[], example:``, notes:`` },
+    { id:'grid', name:'grid', category:'analysis', desc:`Calculate 3D density grid`, syntax:`grid <filename> <dx> <dy> <dz> [origin] [<mask>] [box]`, options:[], example:``, notes:`` },
+    { id:'hausdorff', name:'hausdorff', category:'analysis', desc:`Calculate Hausdorff distance between two masks`, syntax:`hausdorff [<name>] <mask1> <mask2> [out <file>]`, options:[], example:``, notes:`` },
+    { id:'hmassrepartition', name:'hmassrepartition', category:'action', desc:`Hydrogen mass repartitioning for longer timesteps`, syntax:`hmassrepartition [<mask>] [factor <f>]`, options:[], example:``, notes:`` },
+    { id:'image', name:'image', category:'action', desc:`Image molecules into primary unit cell`, syntax:`image [familiar] [bymol|byres|byatom] [<mask>] [origin] [center]`, options:[], example:``, notes:`` },
+    { id:'integrate', name:'integrate', category:'analysis', desc:`Integrate a data set (trapezoidal rule)`, syntax:`integrate <dataset> [out <file>]`, options:[], example:``, notes:`` },
+    { id:'ired', name:'ired', category:'analysis', desc:`iRED analysis of NMR order parameters`, syntax:`ired [relax freq <MHz>] [order <o>] [orderparamfile <f>] [tstep <t>] [tcorr <t>] [out <f>]`, options:[], example:``, notes:`` },
+    { id:'jcoupling', name:'jcoupling', category:'analysis', desc:`Calculate J-coupling constants from dihedrals`, syntax:`jcoupling [<mask>] [kfile <karplus_file>] [out <file>]`, options:[], example:``, notes:`` },
+    { id:'kde', name:'kde', category:'analysis', desc:`Kernel density estimation of a data set`, syntax:`kde <dataset> [out <file>] [bandwidth <bw>] [bins <N>]`, options:[], example:``, notes:`` },
+    { id:'lessplit', name:'lessplit', category:'action', desc:`Split LES trajectory into replicas`, syntax:`lessplit [out <prefix>] [<fmt>]`, options:[], example:``, notes:`` },
+    { id:'lie', name:'lie', category:'analysis', desc:`Linear interaction energy calculation`, syntax:`lie <mask1> [<mask2>] [out <file>] [elec <scale>] [vdw <scale>]`, options:[], example:``, notes:`` },
+    { id:'lifetime', name:'lifetime', category:'analysis', desc:`Lifetime analysis of hydrogen bonds or contacts`, syntax:`lifetime <dataset> [out <file>] [window <w>] [cut <cut>] [name <name>]`, options:[], example:``, notes:`` },
+    { id:'lipidorder', name:'lipidorder', category:'analysis', desc:`Calculate lipid tail order parameters (Scd)`, syntax:`lipidorder [<mask>] [out <file>] [scd] [unsat]`, options:[], example:``, notes:`` },
+    { id:'lipidscd', name:'lipidscd', category:'analysis', desc:`Lipid Scd order parameter calculation`, syntax:`lipidscd [<mask>] [out <file>]`, options:[], example:``, notes:`` },
+    { id:'loadcrd', name:'loadcrd', category:'input', desc:`Load trajectory into COORDS data set`, syntax:`loadcrd <filename> [<fmt>] [<mask>] name <setname>`, options:[], example:``, notes:`` },
+    { id:'loadtraj', name:'loadtraj', category:'input', desc:`Load trajectory (alias for trajin inside scripts)`, syntax:`loadtraj <filename> [<fmt>] [<mask>]`, options:[], example:``, notes:`` },
+    { id:'lowestcurve', name:'lowestcurve', category:'analysis', desc:`Compute lowest free energy curve from 2D data`, syntax:`lowestcurve <dataset> [out <file>] [step <s>]`, options:[], example:``, notes:`` },
+    { id:'makestructure', name:'makestructure', category:'action', desc:`Build structure using idealized geometry`, syntax:`makestructure <sstype>:<res_range>[,...] [out <prefix>]`, options:[], example:``, notes:`` },
+    { id:'meltcurve', name:'meltcurve', category:'analysis', desc:`Generate melting curve from temperature-dependent data`, syntax:`meltcurve <dataset> [out <file>] [norm]`, options:[], example:``, notes:`` },
+    { id:'mindist', name:'mindist', category:'analysis', desc:`Minimum/maximum distance between two masks`, syntax:`mindist [<name>] <mask1> <mask2> [out <file>] [noimage]`, options:[], example:``, notes:`` },
+    { id:'minimage', name:'minimage', category:'action', desc:`Minimum image distance (periodic)`, syntax:`minimage [<name>] <mask1> <mask2> [out <file>]`, options:[], example:``, notes:`` },
+    { id:'modes', name:'modes', category:'analysis', desc:`Analyze normal modes from diagonalized matrix`, syntax:`modes {fluct|displ|corr|eigenval|trajout} name <modesname> [beg <b>] [end <e>] [out <file>]`, options:[], example:``, notes:`` },
+    { id:'molinfo', name:'molinfo', category:'action', desc:`Print molecular information for atom mask`, syntax:`molinfo [<mask>] [<topology tag>]`, options:[], example:``, notes:`` },
+    { id:'molsurf', name:'molsurf', category:'analysis', desc:`MSMS/molsurf solvent accessible surface area`, syntax:`molsurf [<name>] [<mask>] [out <file>] [probe <r>]`, options:[], example:``, notes:`` },
+    { id:'multicurve', name:'multicurve', category:'analysis', desc:`Fit multiple curves to data`, syntax:`multicurve [<dataset>] [out <file>] [nexp <N>]`, options:[], example:``, notes:`` },
+    { id:'multihist', name:'multihist', category:'analysis', desc:`Histogram multiple data sets simultaneously`, syntax:`multihist <set1> [<set2>...] [out <file>] [bins <N>]`, options:[], example:``, notes:`` },
+    { id:'multipucker', name:'multipucker', category:'analysis', desc:`Calculate ring pucker for multiple residues`, syntax:`multipucker [<mask>] [out <file>] [amplitude] [theta]`, options:[], example:``, notes:`` },
+    { id:'multivector', name:'multivector', category:'analysis', desc:`Calculate vectors for multiple residue pairs`, syntax:`multivector [<mask>] [out <file>] [ired]`, options:[], example:``, notes:`` },
+    { id:'nastruct', name:'nastruct', category:'analysis', desc:`Nucleic acid structure parameters (base pairs, helical)`, syntax:`nastruct [<name>] [resrange <range>] [naout <suffix>] [sscalc] [noheader]`, options:[], example:``, notes:`` },
+    { id:'outtraj', name:'outtraj', category:'output', desc:`Write frames to trajectory during processing`, syntax:`outtraj <filename> [<fmt>] [<mask>] [nobox] [onlyframes <range>]`, options:[], example:``, notes:`` },
+    { id:'pairdist', name:'pairdist', category:'analysis', desc:`Pairwise distance between all atom pairs`, syntax:`pairdist [<name>] [<mask>] [out <file>] [delta <dx>] [max <max>]`, options:[], example:``, notes:`` },
+    { id:'pairwise', name:'pairwise', category:'analysis', desc:`Pairwise energy decomposition between residues`, syntax:`pairwise [<mask>] [out <file>] [cut <cut>] [cuteelec <c>] [cutevdw <c>]`, options:[], example:``, notes:`` },
+    { id:'parmbox', name:'parmbox', category:'action', desc:`Set periodic box in topology`, syntax:`parmbox {x <x> y <y> z <z> [alpha <a> beta <b> gamma <g>] | nobox}`, options:[], example:``, notes:`` },
+    { id:'parminfo', name:'parminfo', category:'action', desc:`Print topology information summary`, syntax:`parminfo [<mask>] [<topology tag>]`, options:[], example:``, notes:`` },
+    { id:'parmstrip', name:'parmstrip', category:'action', desc:`Strip atoms from topology file`, syntax:`parmstrip <mask> [<topology tag>]`, options:[], example:``, notes:`` },
+    { id:'parmwrite', name:'parmwrite', category:'output', desc:`Write topology to file`, syntax:`parmwrite out <filename> [<fmt>] [<topology tag>]`, options:[], example:``, notes:`` },
+    { id:'permutedihedrals', name:'permutedihedrals', category:'action', desc:`Randomly permute dihedral angles`, syntax:`permutedihedrals [<mask>] [rseed <seed>] [out <file>]`, options:[], example:``, notes:`` },
+    { id:'phipsi', name:'phipsi', category:'analysis', desc:`Ramachandran phi/psi angle calculation`, syntax:`phipsi [<mask>] [out <file>] [name <name>] [resrange <range>]`, options:[], example:``, notes:`` },
+    { id:'precision', name:'precision', category:'output', desc:`Set output precision for data files`, syntax:`precision <file> <width> [<digits>]`, options:[], example:``, notes:`` },
+    { id:'prepareforleap', name:'prepareforleap', category:'action', desc:`Prepare structure for LEaP (add missing atoms)`, syntax:`prepareforleap [<mask>] [out <file>] [pdbout <file>]`, options:[], example:``, notes:`` },
+    { id:'principal', name:'principal', category:'analysis', desc:`Calculate principal axes and moments of inertia`, syntax:`principal [<name>] [<mask>] [out <file>] [dorotation] [mass]`, options:[], example:``, notes:`` },
+    { id:'radial', name:'radial', category:'analysis', desc:`Radial distribution function (RDF)`, syntax:`radial [out <file>] <spacing> <maximum> <solvent_mask> [<solute_mask>] [noimage]`, options:[], example:``, notes:`` },
+    { id:'randomizeions', name:'randomizeions', category:'action', desc:`Randomly swap ions with solvent molecules`, syntax:`randomizeions <ion_mask> [by <solvent_mask>] [around <solute_mask>] [min <d>] [rseed <s>]`, options:[], example:``, notes:`` },
+    { id:'readdata', name:'readdata', category:'input', desc:`Read data from file into data sets`, syntax:`readdata <filename> [as <fmt>] [name <name>] [index <col>]`, options:[], example:``, notes:`` },
+    { id:'regress', name:'regress', category:'analysis', desc:`Linear regression of a data set`, syntax:`regress <dataset> [out <file>] [results <file>]`, options:[], example:``, notes:`` },
+    { id:'remap', name:'remap', category:'action', desc:`Remap atom ordering to match a reference`, syntax:`remap [<mask>] <reference>`, options:[], example:``, notes:`` },
+    { id:'remlog', name:'remlog', category:'analysis', desc:`Analyze replica exchange log files`, syntax:`remlog <remlogfile> [out <file>] [nstlim <N>] [temp0 <T>]`, options:[], example:``, notes:`` },
+    { id:'replicatecell', name:'replicatecell', category:'action', desc:`Replicate the unit cell in 3D`, syntax:`replicatecell [<mask>] [out <prefix>] {all | dir X Y Z}`, options:[], example:``, notes:`` },
+    { id:'resinfo', name:'resinfo', category:'action', desc:`Print residue information`, syntax:`resinfo [<mask>] [<topology tag>]`, options:[], example:``, notes:`` },
+    { id:'rms2d', name:'rms2d', category:'analysis', desc:`Pairwise RMSD matrix between all frame pairs`, syntax:`rms2d [<name>] [<mask>] [out <file>] [mass] [nofit] [reftraj <traj>]`, options:[], example:``, notes:`` },
+    { id:'rmsavgcorr', name:'rmsavgcorr', category:'analysis', desc:`Correlation of running-average RMSD vs window size`, syntax:`rmsavgcorr [<mask>] [out <file>] [mass]`, options:[], example:``, notes:`` },
+    { id:'rotate', name:'rotate', category:'action', desc:`Rotate coordinates around an axis`, syntax:`rotate [<mask>] {axis <x,y,z> degrees <d> | x|y|z <deg>}`, options:[], example:``, notes:`` },
+    { id:'rotatedihedral', name:'rotatedihedral', category:'action', desc:`Rotate a specific dihedral angle to a value`, syntax:`rotatedihedral [<mask>] res <r> type <phi|psi|chi1...> val <degrees>`, options:[], example:``, notes:`` },
+    { id:'rotdif', name:'rotdif', category:'analysis', desc:`Rotational diffusion from NMR relaxation`, syntax:`rotdif [out <file>] [rvecin <file>] [rseed <seed>] [nvecs <N>]`, options:[], example:``, notes:`` },
+    { id:'runningavg', name:'runningavg', category:'analysis', desc:`Running average (sliding window) of a data set`, syntax:`runningavg <dataset> [out <file>] [window <w>]`, options:[], example:``, notes:`` },
+    { id:'scale', name:'scale', category:'action', desc:`Scale coordinates by a factor`, syntax:`scale [<mask>] [x <fx>] [y <fy>] [z <fz>]`, options:[], example:``, notes:`` },
+    { id:'select', name:'select', category:'action', desc:`Select atoms by mask and print info`, syntax:`select <mask>`, options:[], example:``, notes:`` },
+    { id:'selectds', name:'selectds', category:'output', desc:`Select data sets matching a string`, syntax:`selectds <selection>`, options:[], example:``, notes:`` },
+    { id:'sequence', name:'sequence', category:'action', desc:`Print amino acid or nucleic acid sequence`, syntax:`sequence [<mask>] [<topology tag>]`, options:[], example:``, notes:`` },
+    { id:'setvelocity', name:'setvelocity', category:'action', desc:`Assign velocities from Maxwell-Boltzmann distribution`, syntax:`setvelocity [<mask>] [temp <T>] [rseed <seed>]`, options:[], example:``, notes:`` },
+    { id:'slope', name:'slope', category:'analysis', desc:`Calculate slope of a data set by linear fit`, syntax:`slope <dataset> [out <file>]`, options:[], example:``, notes:`` },
+    { id:'solvent', name:'solvent', category:'action', desc:`Define solvent molecules in topology`, syntax:`solvent [<mask>] [<topology tag>]`, options:[], example:``, notes:`` },
+    { id:'spam', name:'spam', category:'analysis', desc:`Solvation parameters from analysis of MD (SPAM)`, syntax:`spam <site_file> [out <file>] [name <name>] [DG <dg>]`, options:[], example:``, notes:`` },
+    { id:'splitcoords', name:'splitcoords', category:'action', desc:`Split COORDS set into separate sets by frame`, syntax:`splitcoords <crdset> [<range>] name <prefix>`, options:[], example:``, notes:`` },
+    { id:'stfcdiffusion', name:'stfcdiffusion', category:'analysis', desc:`Diffusion using STFC method for charged particles`, syntax:`stfcdiffusion [<mask>] [out <file>] [time <dt>] [x|y|z|xy|xz|yz|xyz]`, options:[], example:``, notes:`` },
+    { id:'symmrmsd', name:'symmrmsd', category:'analysis', desc:`RMSD with symmetry correction for equivalent atoms`, syntax:`symmrmsd [<name>] [<mask>] [ref <ref>|first] [out <file>] [remap]`, options:[], example:``, notes:`` },
+    { id:'temperature', name:'temperature', category:'analysis', desc:`Calculate instantaneous temperature from velocities`, syntax:`temperature [<name>] [<mask>] [out <file>] [frame]`, options:[], example:``, notes:`` },
+    { id:'ti', name:'ti', category:'analysis', desc:`Thermodynamic integration (TI) free energy`, syntax:`ti <dset0> [<dset1>...] {nq <n>|xvals <x>} [out <file>] [name <name>]`, options:[], example:``, notes:`` },
+    { id:'tica', name:'tica', category:'analysis', desc:`Time-lagged independent component analysis`, syntax:`tica {crdset <COORDS>|data <sets>} [lag <lag>] [nvecs <N>] [out <file>]`, options:[], example:``, notes:`` },
+    { id:'timecorr', name:'timecorr', category:'analysis', desc:`Time correlation function of vectors`, syntax:`timecorr vec1 <set> [vec2 <set>] [out <file>] [tstep <t>] [tcorr <t>]`, options:[], example:``, notes:`` },
+    { id:'tordiff', name:'tordiff', category:'analysis', desc:`Torsion angle difference between two structures`, syntax:`tordiff [<mask>] [out <file>] [ref <ref>]`, options:[], example:``, notes:`` },
+    { id:'translate', name:'translate', category:'action', desc:`Translate coordinates by a vector`, syntax:`translate [<mask>] [x <dx>] [y <dy>] [z <dz>]`, options:[], example:``, notes:`` },
+    { id:'unstrip', name:'unstrip', category:'action', desc:`Restore previously stripped atoms`, syntax:`unstrip`, options:[], example:``, notes:`` },
+    { id:'unwrap', name:'unwrap', category:'action', desc:`Unwrap trajectory (remove PBC jumps)`, syntax:`unwrap [<mask>] [center] [bymol|byres]`, options:[], example:``, notes:`` },
+    { id:'updateparameters', name:'updateparameters', category:'action', desc:`Update force field parameters in topology`, syntax:`updateparameters {<bond_args>|<angle_args>|<dih_args>}`, options:[], example:``, notes:`` },
+    { id:'vector', name:'vector', category:'analysis', desc:`Calculate a vector between two masks over time`, syntax:`vector [<name>] <mask1> <mask2> [out <file>] [ired]`, options:[], example:``, notes:`` },
+    { id:'vectormath', name:'vectormath', category:'analysis', desc:`Math operations on vector data sets`, syntax:`vectormath vec1 <set> [vec2 <set>] {dotproduct|crossproduct|...} [out <file>]`, options:[], example:``, notes:`` },
+    { id:'velocityautocorr', name:'velocityautocorr', category:'analysis', desc:`Velocity autocorrelation function (VACF)`, syntax:`velocityautocorr [<mask>] [out <file>] [tstep <t>] [maxlag <m>] [norm]`, options:[], example:``, notes:`` },
+    { id:'volume', name:'volume', category:'analysis', desc:`Unit cell volume over trajectory`, syntax:`volume [<name>] [out <file>]`, options:[], example:``, notes:`` },
+    { id:'wavelet', name:'wavelet', category:'analysis', desc:`Wavelet analysis of trajectory data`, syntax:`wavelet [<mask>] [out <file>] [type <wavelet>] [nb <N>]`, options:[], example:``, notes:`` },
+];
+
+// ─────────────────────────────────────────────────────────────────────────────
+// STATE
+// ─────────────────────────────────────────────────────────────────────────────
+let currentFilter = 'all';
+let currentSearch = '';
+let selectedCmd   = null;
+let uploadedFiles = [];
+let rightMode     = 'files';
+let selectedOutfile = null;
+
+// ─────────────────────────────────────────────────────────────────────────────
+// COMMAND LIST
+// ─────────────────────────────────────────────────────────────────────────────
+function getFiltered() {
+  return COMMANDS.filter(c => {
+    const ok = currentFilter === 'all' || c.category === currentFilter;
+    const q  = currentSearch.toLowerCase();
+    const m  = !q || c.name.includes(q) || c.desc.toLowerCase().includes(q) || (c.notes||'').toLowerCase().includes(q);
+    return ok && m;
+  });
+}
+
+function renderCommands() {
+  const cmds = getFiltered();
+  document.getElementById('cmd-count').textContent = cmds.length + ' cmds';
+  const src = document.getElementById('search-results-count');
+  if (currentSearch) {
+    src.textContent = `${cmds.length} result${cmds.length!==1?'s':''} for "${currentSearch}"`;
+    src.style.display = 'block';
+  } else { src.style.display = 'none'; }
+
+  document.getElementById('cmdList').innerHTML = cmds.map(c => {
+    const active = selectedCmd && selectedCmd.id === c.id ? 'active' : '';
+    const bc = `badge-${c.category}`;
+    const hl = currentSearch ? c.name.replace(new RegExp(currentSearch,'gi'), m => `<mark class="search-highlight">${m}</mark>`) : c.name;
+    return `<div class="cmd-item ${active}" onclick="selectCmd('${c.id}')">
+      <div class="cmd-name">${hl}<span class="cmd-badge ${bc}">${c.category}</span></div>
+      <div class="cmd-desc">${c.desc}</div>
+    </div>`;
+  }).join('');
+}
+
+function selectCmd(id) {
+  selectedCmd = COMMANDS.find(c => c.id === id);
+  renderCommands();
+  renderDetail();
+  setRightTab('detail', document.getElementById('rtab-detail'));
+}
+
+function renderDetail() {
+  const el = document.getElementById('cmdDetail');
+  if (!selectedCmd) {
+    el.innerHTML = '<div class="no-select"><div class="big">⬡</div><div>Select a command from the reference panel</div></div>';
+    return;
+  }
+  const c = selectedCmd;
+  const opts = c.options.map(([k,v]) =>
+    `<div class="option-row"><div class="option-key">${k}</div><div class="option-val">${v}</div></div>`
+  ).join('');
+  el.innerHTML = `
+    <div class="detail-title">${c.name}</div>
+    <div class="detail-category">${c.category} command</div>
+    <div class="detail-desc">${c.desc}</div>
+    <div class="detail-section">
+      <div class="detail-section-title">Syntax</div>
+      <div class="syntax-block">
+        <button class="copy-btn" onclick="copyText(\`${c.syntax.replace(/`/g,"'")}\`)">Copy</button>
+        ${highlightSyntax(c.syntax)}
+      </div>
+      <button class="insert-btn" onclick="insertToEditor(\`${c.syntax.replace(/`/g,"'")}\n\`)">⊕ Insert syntax into Editor</button>
+    </div>
+    ${c.options.length ? `<div class="detail-section"><div class="detail-section-title">Options</div>${opts}</div>` : ''}
+    <div class="detail-section">
+      <div class="detail-section-title">Example</div>
+      <div class="example-block">${c.example}</div>
+      <button class="insert-btn" style="margin-top:8px" onclick="insertToEditor(\`${c.example.replace(/`/g,"'")}\n\`)">⊕ Insert example</button>
+    </div>
+    ${c.notes ? `<div class="detail-section"><div class="detail-section-title">Notes</div><div style="font-size:12px;color:var(--text-muted);line-height:1.6">${c.notes}</div></div>` : ''}
+  `;
+}
+
+function highlightSyntax(text) {
+  return text
+    .replace(/\[([^\]]+)\]/g, '<span class="o">[$1]</span>')
+    .replace(/^(\w+)/, '<span class="k">$1</span>');
+}
+
+function setFilter(f, el) {
+  currentFilter = f;
+  document.querySelectorAll('.filter-tab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  renderCommands();
+}
+
+function filterCommands(val) {
+  currentSearch = val.trim();
+  renderCommands();
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// EDITOR HELPERS
+// ─────────────────────────────────────────────────────────────────────────────
+function insertToEditor(text) {
+  const ed = document.getElementById('editor');
+  const s  = ed.selectionStart;
+  const before = ed.value.substring(0, s);
+  const after  = ed.value.substring(ed.selectionEnd);
+  const insert = (before && !before.endsWith('\n') ? '\n' : '') + text;
+  ed.value = before + insert + after;
+  ed.selectionStart = ed.selectionEnd = before.length + insert.length;
+  ed.focus();
+  updateLineNumbers();
+}
+
+function copyText(text) {
+  navigator.clipboard.writeText(text).catch(() => {});
+}
+
+function clearEditor() {
+  document.getElementById('editor').value = '';
+  updateLineNumbers();
+}
+
+function downloadScript() {
+  const blob = new Blob([document.getElementById('editor').value], {type:'text/plain'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'analysis.cpptraj';
+  a.click();
+}
+
+function updateLineNumbers() {
+  const ed    = document.getElementById('editor');
+  const lines = ed.value.split('\n');
+  document.getElementById('lineNumbers').innerHTML = lines.map((_,i) => `<span>${i+1}</span>`).join('');
+  document.getElementById('lineCount').textContent = lines.length + ' lines';
+}
+
+function syncScroll() {
+  document.getElementById('lineNumbers').scrollTop = document.getElementById('editor').scrollTop;
+}
+
+document.getElementById('editor').addEventListener('keydown', e => {
+  if (e.key === 'Tab') {
+    e.preventDefault();
+    const ed = e.target, s = ed.selectionStart;
+    ed.value = ed.value.substring(0,s) + '  ' + ed.value.substring(ed.selectionEnd);
+    ed.selectionStart = ed.selectionEnd = s + 2;
+    updateLineNumbers();
+  }
+});
+
+document.getElementById('editor').addEventListener('click',  e => updateCursor(e.target));
+document.getElementById('editor').addEventListener('keyup',   e => updateCursor(e.target));
+
+function updateCursor(ed) {
+  const txt   = ed.value.substring(0, ed.selectionStart);
+  const lines = txt.split('\n');
+  document.getElementById('cursorPos').textContent = `Ln ${lines.length}, Col ${lines[lines.length-1].length+1}`;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// FILE UPLOAD  →  real backend
+// ─────────────────────────────────────────────────────────────────────────────
+const ICONS = {prmtop:'🧬',parm7:'🧬',psf:'🧬',gro:'🧬',nc:'🎞️',trj:'🎞️',dcd:'🎞️',xtc:'🎞️',mdcrd:'🎞️',pdb:'📄',rst7:'💾',inpcrd:'💾'};
+
+async function handleFiles(files) {
+  for (const f of Array.from(files)) {
+    if (uploadedFiles.find(u => u.name === f.name)) continue;
+    termLog(`[upload] Uploading ${f.name}…`, 't-info');
+    try {
+      const fd = new FormData();
+      fd.append('file', f);
+      const r    = await fetch('/api/upload', { method:'POST', body:fd });
+      const data = await r.json();
+      if (data.error) { termLog(`[upload] Error: ${data.error}`, 't-error'); continue; }
+      uploadedFiles.push({ name:f.name, size:f.size, kind:data.kind, ext:data.ext });
+      termLog(`[upload] ✓ ${f.name} (${data.kind})`, 't-success');
+    } catch(e) {
+      termLog(`[upload] Failed: ${e.message}`, 't-error');
+    }
+  }
+  renderFileList();
+  refreshStatus();
+}
+
+function renderFileList() {
+  document.getElementById('fileList').innerHTML = uploadedFiles.map((f,i) => {
+    const ext  = f.name.split('.').pop().toLowerCase();
+    const icon = ICONS[ext] || '📄';
+    const sz   = f.size > 1e6 ? (f.size/1e6).toFixed(1)+'MB' : (f.size/1024).toFixed(1)+'KB';
+    const kindColor = f.kind === 'topology' ? 'var(--accent4)' : f.kind === 'trajectory' ? 'var(--accent)' : 'var(--text-muted)';
+    return `<div class="file-item">
+      <div class="file-icon">${icon}</div>
+      <div class="file-info">
+        <div class="file-name">${f.name}</div>
+        <div class="file-meta" style="color:${kindColor}">${f.kind||ext.toUpperCase()} · ${sz}</div>
+      </div>
+      <div class="file-remove" onclick="removeFile(${i})">✕</div>
+    </div>`;
+  }).join('');
+}
+
+function removeFile(i) {
+  uploadedFiles.splice(i, 1);
+  renderFileList();
+}
+
+// Drag & drop
+const zone = document.getElementById('uploadZone');
+zone.addEventListener('dragover',  e => { e.preventDefault(); zone.classList.add('drag-over'); });
+zone.addEventListener('dragleave', () => zone.classList.remove('drag-over'));
+zone.addEventListener('drop', e => {
+  e.preventDefault();
+  zone.classList.remove('drag-over');
+  handleFiles(e.dataTransfer.files);
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TERMINAL
+// ─────────────────────────────────────────────────────────────────────────────
+function termLog(text, cls='t-info') {
+  const body = document.getElementById('termBody');
+  const span = document.createElement('span');
+  span.className = 't-line ' + cls;
+  span.textContent = text;
+  body.appendChild(span);
+  body.scrollTop = body.scrollHeight;
+}
+
+function clearTerminal() {
+  document.getElementById('termBody').innerHTML = '<span class="t-line t-prompt">$  </span>';
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// RUN ANALYSIS  →  real backend
+// ─────────────────────────────────────────────────────────────────────────────
+async function runAnalysis() {
+  const script = document.getElementById('editor').value.trim();
+  if (!script) { alert('Write a cpptraj script first.'); return; }
+
+  document.getElementById('termStatus').textContent = '● RUNNING';
+  document.getElementById('termStatus').style.color = 'var(--accent4)';
+  document.getElementById('progressBar').style.display = 'block';
+  document.getElementById('spinner').style.display     = 'block';
+  document.getElementById('progressFill').style.width  = '15%';
+
+  termLog('');
+  termLog('═══════════════════════════════════════════════════', 't-info');
+  termLog('  ▶  cpptraj  ' + new Date().toLocaleTimeString(), 't-prompt');
+  termLog('═══════════════════════════════════════════════════', 't-info');
+
+  document.getElementById('progressFill').style.width = '40%';
+
+  try {
+    const resp = await fetch('/api/run', {
+      method:  'POST',
+      headers: {'Content-Type':'application/json'},
+      body:    JSON.stringify({ script }),
+    });
+    const data = await resp.json();
+
+    document.getElementById('progressFill').style.width = '90%';
+
+    if (data.error) {
+      termLog(`[error] ${data.error}`, 't-error');
+    } else {
+      if (data.stdout) {
+        data.stdout.split('\n').forEach(l => {
+          if (!l.trim()) return;
+          const cls = l.includes('Error') || l.includes('ERROR') ? 't-error'
+                    : l.includes('Warning') ? 't-warning'
+                    : l.includes('CPPTRAJ') || l.startsWith('  ') ? 't-data'
+                    : 't-success';
+          termLog(l, cls);
+        });
+      }
+      if (data.stderr && data.stderr.trim()) {
+        termLog('');
+        termLog('[stderr]', 't-warning');
+        data.stderr.split('\n').filter(Boolean).forEach(l => termLog(l, 't-error'));
+      }
+
+      termLog('');
+      if (data.success) {
+        termLog(`═══════════════════════════════════════════════════`, 't-info');
+        termLog(`  ✓  Done in ${data.elapsed}s  ·  ${data.output_files.length} file(s) written`, 't-success');
+        if (data.output_files.length) termLog(`  Files: ${data.output_files.join(', ')}`, 't-data');
+        termLog(`═══════════════════════════════════════════════════`, 't-info');
+      } else {
+        termLog(`  ✗  cpptraj returned an error — check stderr above`, 't-error');
+      }
+    }
+  } catch(e) {
+    termLog(`[network error] ${e.message}`, 't-error');
+    termLog('[note] Is the Flask server running? (python server.py)', 't-warning');
+  }
+
+  document.getElementById('progressFill').style.width = '100%';
+  document.getElementById('termStatus').textContent = '● IDLE';
+  document.getElementById('termStatus').style.color = 'var(--accent2)';
+  document.getElementById('spinner').style.display = 'none';
+  setTimeout(() => {
+    document.getElementById('progressBar').style.display = 'none';
+    document.getElementById('progressFill').style.width  = '0%';
+  }, 1500);
+
+  // Auto-refresh output files
+  await refreshOutputFiles();
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// RIGHT PANEL TABS
+// ─────────────────────────────────────────────────────────────────────────────
+function setRightTab(mode, el) {
+  rightMode = mode;
+  document.querySelectorAll('.rtab').forEach(b => b.classList.remove('active'));
+  el.classList.add('active');
+  const ids = ['files','detail','ai','output','viewer'];
+  ids.forEach(id => {
+    const t = document.getElementById(`tab-${id}`);
+    if (t) t.style.display = id === mode ? 'flex' : 'none';
+  });
+  if (mode === 'output') refreshOutputFiles();
+  if (mode === 'viewer') setTimeout(initNGL, 50);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// OUTPUT FILES
+// ─────────────────────────────────────────────────────────────────────────────
+async function refreshOutputFiles() {
+  try {
+    const r     = await fetch('/api/files');
+    const files = await r.json();
+    const list  = document.getElementById('outfilesList');
+
+    if (!files.length) {
+      list.innerHTML = '<div class="no-select" style="padding:20px 10px"><div style="font-size:28px;margin-bottom:8px">📊</div><div style="font-size:12px">No output files yet.<br>Run an analysis first.</div></div>';
+      return;
+    }
+
+    list.innerHTML = files.map(f => {
+      const sel = selectedOutfile === f.name ? 'sel' : '';
+      const sz  = f.size > 1024 ? (f.size/1024).toFixed(1)+'KB' : f.size+'B';
+      return `<div class="outfile-item ${sel}" onclick="viewOutputFile('${f.name}')">
+        <span style="font-size:14px">📄</span>
+        <span class="outfile-name">${f.name}</span>
+        <span class="outfile-size">${sz}</span>
+      </div>`;
+    }).join('');
+  } catch(e) { /* server not running yet */ }
+}
+
+async function viewOutputFile(name) {
+  selectedOutfile = name;
+  await refreshOutputFiles();
+
+  const viewer  = document.getElementById('outfileViewer');
+  const content = document.getElementById('outfileViewerContent');
+  const nameEl  = document.getElementById('outfileViewerName');
+  const dlBtn   = document.getElementById('outfileDlBtn');
+
+  try {
+    const r    = await fetch(`/api/file/${encodeURIComponent(name)}`);
+    const text = await r.text();
+    viewer.style.display  = 'flex';
+    document.getElementById('divOutH').style.display = 'block';
+    nameEl.textContent    = name;
+    content.textContent   = text.slice(0, 4000) + (text.length > 4000 ? '\n… (truncated)' : '');
+
+    dlBtn.onclick = () => {
+      const blob = new Blob([text], {type:'text/plain'});
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = name;
+      a.click();
+    };
+  } catch(e) {}
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// AI AGENT CHAT
+// ─────────────────────────────────────────────────────────────────────────────
+const QUICK_PROMPTS = [
+  'RMSD backbone vs first frame',
+  'RMSF per residue',
+  'Radius of gyration',
+  'H-bonds protein–ligand',
+  'Cluster into 5 structures',
+  'PCA first 3 modes',
+  'SASA over time',
+  'Secondary structure',
+];
+
+function renderChips() {
+  document.getElementById('chipRow').innerHTML = QUICK_PROMPTS.map(q =>
+    `<button class="chip" onclick="sendChatMsg('${q.replace(/'/g,"\\'")}')">${q}</button>`
+  ).join('');
+}
+
+function appendChatMsg(role, html, toolCalls) {
+  const box  = document.getElementById('chatMessages');
+  const isU  = role === 'user';
+  const wrap = document.createElement('div');
+  wrap.className = `chat-msg ${isU ? 'user' : ''}`;
+
+  let toolHtml = '';
+  if (toolCalls && toolCalls.length) {
+    toolHtml = toolCalls.map((tc, i) => {
+      const uid = `tc_${Date.now()}_${i}`;
+      const scriptBlock = tc.script ? `<pre>${escHtml(tc.script.slice(0, 1500))}</pre>` : '';
+      return `<div class="tool-acc">
+        <div class="tool-acc-hdr" onclick="toggleAcc('${uid}')">
+          <span>⚙</span>
+          <span class="tool-tag">${tc.tool}</span>
+          <span>${tc.script ? '· script (' + tc.script.split('\n').length + ' lines)' : ''}</span>
+          <span style="margin-left:auto;color:var(--text-dim)">▾</span>
+        </div>
+        <div class="tool-acc-body" id="${uid}">
+          ${scriptBlock}
+          <div style="color:var(--text-muted);margin-top:6px;border-top:1px solid var(--border);padding-top:6px">Result: ${escHtml(tc.result.slice(0,800))}</div>
+        </div>
+      </div>`;
+    }).join('');
+  }
+
+  wrap.innerHTML = `
+    <div class="avatar ${isU ? 'avatar-u' : 'avatar-a'}">${isU ? 'U' : 'AI'}</div>
+    <div>
+      <div class="bubble ${isU ? 'bubble-u' : 'bubble-a'}">${html}</div>
+      ${toolHtml}
+    </div>`;
+  box.appendChild(wrap);
+  box.scrollTop = box.scrollHeight;
+}
+
+function toggleAcc(id) {
+  const el = document.getElementById(id);
+  el.classList.toggle('open');
+}
+
+function escHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function mdToHtml(text) {
+  // Extract fenced code blocks first to protect them
+  const codeBlocks = [];
+  text = text.replace(/```(\w*)\n?([\s\S]*?)```/g, (_, lang, code) => {
+    codeBlocks.push(`<pre><code>${escHtml(code.trim())}</code></pre>`);
+    return `\x00CODE${codeBlocks.length - 1}\x00`;
+  });
+
+  // Split into lines for block-level processing
+  const lines = text.split('\n');
+  const out = [];
+  let i = 0;
+
+  while (i < lines.length) {
+    const line = lines[i];
+
+    // Horizontal rule
+    if (/^---+$/.test(line.trim())) { out.push('<hr>'); i++; continue; }
+
+    // Headings
+    const hm = line.match(/^(#{1,4})\s+(.*)/);
+    if (hm) {
+      const lvl = hm[1].length + 1; // h2-h5 so it fits chat style
+      out.push(`<h${lvl} style="margin:10px 0 4px;font-size:${16 - hm[1].length}px">${inlineMd(hm[2])}</h${lvl}>`);
+      i++; continue;
+    }
+
+    // Tables: detect a pipe-table block
+    if (line.includes('|') && i + 1 < lines.length && /^\s*\|?[\s:|-]+\|/.test(lines[i + 1])) {
+      const tableLines = [];
+      while (i < lines.length && lines[i].includes('|')) { tableLines.push(lines[i]); i++; }
+      out.push(buildTable(tableLines));
+      continue;
+    }
+
+    // Unordered list
+    if (/^(\s*)[-*+]\s+/.test(line)) {
+      const items = [];
+      while (i < lines.length && /^(\s*)[-*+]\s+/.test(lines[i])) {
+        items.push(`<li>${inlineMd(lines[i].replace(/^\s*[-*+]\s+/, ''))}</li>`);
+        i++;
+      }
+      out.push(`<ul style="margin:4px 0;padding-left:18px">${items.join('')}</ul>`);
+      continue;
+    }
+
+    // Ordered list
+    if (/^\d+\.\s+/.test(line)) {
+      const items = [];
+      while (i < lines.length && /^\d+\.\s+/.test(lines[i])) {
+        items.push(`<li>${inlineMd(lines[i].replace(/^\d+\.\s+/, ''))}</li>`);
+        i++;
+      }
+      out.push(`<ol style="margin:4px 0;padding-left:18px">${items.join('')}</ol>`);
+      continue;
+    }
+
+    // Blockquote
+    if (/^>\s*/.test(line)) {
+      const blines = [];
+      while (i < lines.length && /^>\s*/.test(lines[i])) {
+        blines.push(lines[i].replace(/^>\s*/, ''));
+        i++;
+      }
+      out.push(`<blockquote style="border-left:3px solid var(--accent);margin:6px 0;padding:4px 10px;color:var(--text-muted)">${inlineMd(blines.join(' '))}</blockquote>`);
+      continue;
+    }
+
+    // Empty line → paragraph break
+    if (line.trim() === '') { out.push('<br>'); i++; continue; }
+
+    // Normal paragraph line
+    out.push(`<span style="display:block;line-height:1.6">${inlineMd(line)}</span>`);
+    i++;
+  }
+
+  let html = out.join('');
+
+  // Restore code blocks
+  html = html.replace(/\x00CODE(\d+)\x00/g, (_, n) => codeBlocks[+n]);
+  return html;
+}
+
+function inlineMd(text) {
+  return escHtml(text)
+    .replace(/`([^`]+)`/g, '<code style="background:var(--surface2);padding:1px 5px;border-radius:3px;font-size:12px">$1</code>')
+    .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+    .replace(/\*([^*]+)\*/g, '<em>$1</em>')
+    .replace(/~~([^~]+)~~/g, '<del>$1</del>');
+}
+
+function buildTable(lines) {
+  const rows = lines.map(l =>
+    l.replace(/^\|/, '').replace(/\|$/, '').split('|').map(c => c.trim())
+  );
+  if (rows.length < 2) return rows.map(r => escHtml(r.join(' '))).join('<br>');
+  const header = rows[0];
+  const body   = rows.slice(2); // skip separator row
+  const th = header.map(h => `<th style="padding:5px 10px;border-bottom:2px solid var(--border);text-align:left;white-space:nowrap">${inlineMd(h)}</th>`).join('');
+  const trs = body.map(row =>
+    '<tr>' + header.map((_, ci) =>
+      `<td style="padding:4px 10px;border-bottom:1px solid var(--border)">${inlineMd(row[ci] ?? '')}</td>`
+    ).join('') + '</tr>'
+  ).join('');
+  return `<div style="overflow-x:auto;margin:8px 0"><table style="border-collapse:collapse;font-size:12px;width:100%"><thead><tr>${th}</tr></thead><tbody>${trs}</tbody></table></div>`;
+}
+
+function addThinkingIndicator() {
+  const box  = document.getElementById('chatMessages');
+  const el   = document.createElement('div');
+  el.className = 'chat-msg';
+  el.id = 'thinking-indicator';
+  el.innerHTML = `
+    <div class="avatar avatar-a">AI</div>
+    <div class="bubble bubble-a">
+      <div class="thinking"><span></span><span></span><span></span></div>
+    </div>`;
+  box.appendChild(el);
+  box.scrollTop = box.scrollHeight;
+}
+
+function removeThinkingIndicator() {
+  const el = document.getElementById('thinking-indicator');
+  if (el) el.remove();
+}
+
+function chatKeydown(e) {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendChat(); }
+}
+
+async function sendChat() {
+  const input = document.getElementById('chatInput').value.trim();
+  if (!input) return;
+  await sendChatMsg(input);
+}
+
+async function sendChatMsg(msg) {
+  document.getElementById('chatInput').value = '';
+  setRightTab('ai', document.getElementById('rtab-ai'));
+  const box = document.getElementById('chatMessages');
+  const empty = box.querySelector('.no-select');
+  if (empty) empty.remove();
+
+  appendChatMsg('user', escHtml(msg), null);
+
+  const btn = document.getElementById('chatSendBtn');
+  btn.disabled = true;
+
+  // Create AI bubble immediately (will be filled by stream)
+  const msgId    = `msg_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+  const bubbleId = `bubble_${msgId}`;
+  const toolsId  = `tools_${msgId}`;
+  const thinkId  = `think_${msgId}`;
+  const wrap = document.createElement('div');
+  wrap.className = 'chat-msg';
+  wrap.innerHTML = `
+    <div class="avatar avatar-a">AI</div>
+    <div style="flex:1;min-width:0">
+      <div class="bubble bubble-a" id="${bubbleId}" style="display:none"></div>
+      <div id="${toolsId}"></div>
+      <div id="${thinkId}" style="padding:6px 2px"><div class="thinking"><span></span><span></span><span></span></div></div>
+    </div>`;
+  box.appendChild(wrap);
+  box.scrollTop = box.scrollHeight;
+
+  const bubble    = document.getElementById(bubbleId);
+  const toolsDiv  = document.getElementById(toolsId);
+  const thinkEl   = document.getElementById(thinkId);
+  let textAcc     = '';
+  let toolCallLog = [];
+  let hasText     = false;
+  let ranScript   = false;
+
+  try {
+    const r = await fetch('/api/chat/stream', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({message: msg}),
+    });
+
+    if (!r.ok) {
+      const d = await r.json().catch(() => ({error: r.statusText}));
+      thinkEl.style.display = 'none';
+      bubble.style.display = '';
+      bubble.innerHTML = `<span style="color:var(--accent3)">⚠ ${escHtml(d.error || r.statusText)}</span>`;
+      btn.disabled = false;
+      return;
+    }
+
+    const reader  = r.body.getReader();
+    const decoder = new TextDecoder();
+    let buf = '';
+
+    while (true) {
+      const {done, value} = await reader.read();
+      if (done) break;
+      buf += decoder.decode(value, {stream: true});
+      const lines = buf.split('\n');
+      buf = lines.pop();
+
+      for (const line of lines) {
+        if (!line.startsWith('data: ')) continue;
+        let ev;
+        try { ev = JSON.parse(line.slice(6)); } catch { continue; }
+
+        if (ev.type === 'text') {
+          if (!hasText) {
+            hasText = true;
+            thinkEl.style.display = 'none';
+            bubble.style.display = '';
+          }
+          textAcc += ev.chunk;
+          bubble.innerHTML = mdToHtml(textAcc);
+          box.scrollTop = box.scrollHeight;
+
+        } else if (ev.type === 'tool_start') {
+          const uid = `ts_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+          const d = document.createElement('div');
+          d.className = 'tool-acc';
+          d.id = uid;
+          d.innerHTML = `<div class="tool-acc-hdr">
+            <span>⚙</span>
+            <span class="tool-tag">${escHtml(ev.tool)}</span>
+            <span style="color:var(--text-muted)">${escHtml(ev.description)}</span>
+            <span style="margin-left:auto" class="thinking" style="display:inline-flex"><span></span><span></span><span></span></span>
+          </div>`;
+          toolsDiv.appendChild(d);
+          box.scrollTop = box.scrollHeight;
+
+        } else if (ev.type === 'tool_done') {
+          if (ev.tool === 'run_cpptraj_script') ranScript = true;
+          toolCallLog.push({tool: ev.tool, input: ev.input, result: ev.result,
+                            script: ev.input.script || ''});
+          // Find the pending tool_start div and replace it
+          const pending = toolsDiv.lastElementChild;
+          if (pending) {
+            const uid = `td_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+            const scriptBlock = ev.input.script
+              ? `<pre>${escHtml(ev.input.script.slice(0, 1500))}</pre>` : '';
+            pending.outerHTML = `<div class="tool-acc">
+              <div class="tool-acc-hdr" onclick="toggleAcc('${uid}')">
+                <span>⚙</span>
+                <span class="tool-tag">${escHtml(ev.tool)}</span>
+                <span>${ev.input.script ? '· script (' + ev.input.script.split('\\n').length + ' lines)' : ''}</span>
+                <span style="margin-left:auto;color:var(--text-dim)">▾</span>
+              </div>
+              <div class="tool-acc-body" id="${uid}">
+                ${scriptBlock}
+                <div style="color:var(--text-muted);margin-top:6px;border-top:1px solid var(--border);padding-top:6px">Result: ${escHtml((ev.result||'').slice(0,800))}</div>
+              </div>
+            </div>`;
+          }
+          // Show thinking dots below tools while model processes the result
+          hasText = false;
+          thinkEl.style.display = '';
+          box.scrollTop = box.scrollHeight;
+
+        } else if (ev.type === 'done') {
+          thinkEl.style.display = 'none';
+          if (!hasText) bubble.style.display = 'none';
+          if (ranScript) await refreshOutputFiles();
+
+        } else if (ev.type === 'error') {
+          thinkEl.style.display = 'none';
+          bubble.style.display = '';
+          bubble.innerHTML = `<span style="color:var(--accent3)">⚠ ${escHtml(ev.message)}</span>`;
+        }
+      }
+    }
+  } catch(e) {
+    thinkEl.style.display = 'none';
+    bubble.style.display = '';
+    bubble.innerHTML = `<span style="color:var(--accent3)">Network error: ${escHtml(e.message)}</span>`;
+  }
+
+  btn.disabled = false;
+}
+
+async function resetChat() {
+  try { await fetch('/api/chat/reset', {method:'POST'}); } catch {}
+  document.getElementById('chatMessages').innerHTML = `
+    <div class="no-select" style="padding:30px 10px">
+      <div class="big">✦</div>
+      <div style="font-size:12px">Conversation cleared.</div>
+    </div>`;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SETTINGS — multi-provider
+// ─────────────────────────────────────────────────────────────────────────────
+
+const PROVIDER_INFO = {
+  claude: {
+    hint: 'Get your key at console.anthropic.com',
+    models: [
+      { id:'claude-haiku-4-5-20251001', label:'Haiku 4.5  — fast & cheap (recommended)' },
+      { id:'claude-sonnet-4-6',         label:'Sonnet 4.6 — smarter, moderate cost' },
+      { id:'claude-opus-4-6',           label:'Opus 4.6   — most capable, highest cost' },
+    ],
+  },
+  openai: {
+    hint: 'Get your key at platform.openai.com',
+    models: [
+      { id:'gpt-4o-mini',   label:'GPT-4o Mini  — fast & cheap (recommended)' },
+      { id:'gpt-4o',        label:'GPT-4o       — smarter, moderate cost' },
+      { id:'gpt-4-turbo',   label:'GPT-4 Turbo  — strong, higher cost' },
+      { id:'o3-mini',       label:'o3-mini       — reasoning model' },
+    ],
+  },
+  gemini: {
+    hint: 'Get a free key at aistudio.google.com',
+    models: [
+      { id:'gemini-2.0-flash',       label:'Gemini 2.0 Flash   — free tier (recommended)' },
+      { id:'gemini-2.0-flash-lite',  label:'Gemini 2.0 Flash Lite — lightest & free' },
+      { id:'gemini-1.5-flash',       label:'Gemini 1.5 Flash   — free tier' },
+      { id:'gemini-1.5-pro',         label:'Gemini 1.5 Pro     — paid, more capable' },
+      { id:'gemini-2.0-pro-exp',     label:'Gemini 2.0 Pro Exp — experimental' },
+    ],
+  },
+};
+
+function openSettings() {
+  document.getElementById('settingsModal').classList.add('open');
+  onProviderChange();
+}
+
+function closeSettings() {
+  document.getElementById('settingsModal').classList.remove('open');
+}
+
+function onProviderChange() {
+  const p    = document.getElementById('providerSelect').value;
+  const info = PROVIDER_INFO[p] || PROVIDER_INFO.claude;
+  const sel  = document.getElementById('modelSelect');
+  sel.innerHTML = info.models.map(m =>
+    `<option value="${m.id}">${m.label}</option>`
+  ).join('');
+  document.getElementById('providerHint').textContent = info.hint;
+}
+
+async function saveSettings() {
+  const provider  = document.getElementById('providerSelect').value;
+  const api_key   = document.getElementById('apiKeyInput').value.trim();
+  const model     = document.getElementById('modelSelect').value;
+  const base_url  = '';
+  try {
+    const r = await fetch('/api/set_provider', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ provider, api_key, model, base_url }),
+    });
+    const d = await r.json();
+    if (d.ok) termLog(`[settings] Provider set: ${provider} / ${d.model}`, 't-success');
+    else termLog(`[settings] Error: ${d.error}`, 't-error');
+  } catch(e) { termLog(`[settings] ${e.message}`, 't-error'); }
+  closeSettings();
+  refreshStatus();
+}
+
+// Close modal on overlay click
+document.getElementById('settingsModal').addEventListener('click', e => {
+  if (e.target === e.currentTarget) closeSettings();
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// STATUS BAR
+// ─────────────────────────────────────────────────────────────────────────────
+async function refreshStatus() {
+  try {
+    const r    = await fetch('/api/status');
+    const data = await r.json();
+
+    const dot = (id, on) => document.getElementById(id).className = `sdot ${on ? 'on' : 'off'}`;
+    dot('dot-cpptraj', data.cpptraj);
+    dot('dot-parm',    !!data.parm);
+    dot('dot-api',     data.api_key);
+
+    document.getElementById('lbl-cpptraj').textContent = data.cpptraj ? 'cpptraj' : 'cpptraj missing';
+    document.getElementById('lbl-parm').textContent    = data.parm ? data.parm : 'no topology';
+    const provLabel = data.provider ? `${data.provider}${data.model ? ' · '+data.model : ''}` : 'no LLM';
+    document.getElementById('lbl-api').textContent     = data.api_key ? provLabel : 'no LLM set';
+    const badge = document.getElementById('activeModelBadge');
+    if (badge) badge.textContent = data.api_key && data.model ? `${data.model} · RAG` : '(no model set) · RAG';
+  } catch {
+    // Server not up yet
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TEMPLATES
+// ─────────────────────────────────────────────────────────────────────────────
+function loadTemplate() {
+  const templates = [
+    { name:'Basic RMSD + RMSF', script:`# Basic Protein Analysis
+parm topology.prmtop
+trajin trajectory.nc
+
+autoimage
+center !:WAT origin
+
+rmsd backbone @CA,C,N,O first out rmsd.dat
+atomicfluct rmsf @CA byres out rmsf.dat
+radgyr rg !:WAT mass out rg.dat
+
+go` },
+    { name:'H-bond Analysis', script:`# Hydrogen Bond Analysis
+parm system.prmtop
+trajin traj.nc
+
+autoimage
+
+hbond hbonds !:WAT out hbond.dat avgout hbond_avg.dat dist 3.5 angle 135
+
+go` },
+    { name:'Trajectory Clustering', script:`# Trajectory Clustering
+parm protein.prmtop
+trajin trajectory.nc
+
+autoimage
+strip :WAT,Na+,Cl-
+
+cluster clusters @CA hieragglo epsilon 2.0 sieve 10 \\
+  out cluster_assign.dat summary cluster_sum.dat \\
+  info cluster_info.dat repout cluster_rep repfmt pdb
+
+go` },
+    { name:'PCA', script:`# Principal Component Analysis
+parm protein.prmtop
+trajin trajectory.nc
+
+autoimage
+align @CA reference
+
+matrix covar pca_mat @CA out covar.dat
+analyze modes eigenvalues evectors pca_mat out pca_modes.dat
+projection pca_proj evecvecs pca_mat @CA out pca_proj.dat beg 1 end 3
+
+go` },
+    { name:'Strip Solvent & Save', script:`# Strip solvent and write clean trajectory
+parm system.prmtop
+trajin traj.nc
+
+autoimage
+strip :WAT,Na+,Cl-
+
+trajout protein_only.nc
+
+go` },
+  ];
+
+  const names = templates.map((t,i) => `${i+1}. ${t.name}`).join('\n');
+  const choice = prompt(`Choose a template:\n\n${names}\n\nEnter number (1-${templates.length}):`);
+  const idx = parseInt(choice) - 1;
+  if (idx >= 0 && idx < templates.length) {
+    if (!document.getElementById('editor').value.trim() ||
+        confirm(`Replace current script with "${templates[idx].name}"?`)) {
+      document.getElementById('editor').value = templates[idx].script;
+      updateLineNumbers();
+    }
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TEST DATA HELPERS
+// ─────────────────────────────────────────────────────────────────────────────
+async function loadTestFile(filename) {
+  termLog(`[test] Loading ${filename} from server…`, 't-info');
+  try {
+    const r    = await fetch(`/api/test/${encodeURIComponent(filename)}`);
+    const blob = await r.blob();
+    const file = new File([blob], filename);
+    await handleFiles([file]);
+    termLog(`[test] ✓ ${filename} loaded`, 't-success');
+  } catch(e) {
+    termLog(`[test] Failed: ${e.message}`, 't-error');
+  }
+}
+
+function loadTestTopology()   { loadTestFile('protein.prmtop'); }
+function loadTestTrajectory() { loadTestFile('mdin_prod.nc'); }
+
+function loadTestScript() {
+  document.getElementById('editor').value = `# Example analysis — solvated protein (AMBER)
+# Load test files from the Files panel first, then click ▶ Run
+parm  protein.prmtop
+trajin mdin_prod.nc
+
+# Strip solvent and image trajectory
+strip :WAT,Na+,Cl-
+autoimage
+
+# RMSD of backbone vs first frame
+rmsd backbone @CA,C,N,O first out rmsd.dat
+
+# Per-residue flexibility (RMSF)
+atomicfluct rmsf @CA byres out rmsf.dat
+
+# Radius of gyration (protein only)
+radgyr rg @CA mass out rg.dat
+
+# Secondary structure (DSSP)
+secstruct ss out secstruct.dat sumout secstruct_sum.dat
+
+go`;
+  updateLineNumbers();
+  termLog('[test] Example script loaded in editor', 't-success');
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// INIT
+// ─────────────────────────────────────────────────────────────────────────────
+renderCommands();
+renderDetail();
+updateLineNumbers();
+renderChips();
+refreshStatus();
+setInterval(refreshStatus, 10000);
+
+// Initial tab layout
+document.getElementById('tab-files').style.display  = 'flex';
+document.getElementById('tab-files').style.flexDirection = 'column';
+document.getElementById('tab-detail').style.display = 'none';
+document.getElementById('tab-ai').style.display     = 'none';
+document.getElementById('tab-output').style.display = 'none';
+document.getElementById('tab-viewer').style.display = 'none';
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TRAJECTORY VIEWER  (NGL WebGL)
+// ─────────────────────────────────────────────────────────────────────────────
+let nglStage       = null;
+let nglComponent   = null;
+let nglPlayer      = null;
+let nglTotalFrames = 0;
+let nglSpinning    = false;
+
+function initNGL() {
+  if (typeof NGL === 'undefined') {
+    document.getElementById('viewerEmpty').innerHTML =
+      '<div style="font-size:28px">⚠</div><div>NGL library failed to load.<br>Check your internet connection.</div>';
+    return;
+  }
+  const stageEl = document.getElementById('ngl-stage');
+  if (nglStage) {
+    // Already initialised — just fix canvas size
+    setTimeout(() => nglStage.handleResize(), 0);
+    return;
+  }
+  document.getElementById('viewerEmpty').style.display = 'none';
+  nglStage = new NGL.Stage(stageEl, { backgroundColor: '#0d1117', tooltip: false });
+  // Force correct size after first paint and on any container resize
+  setTimeout(() => nglStage.handleResize(), 50);
+  setTimeout(() => nglStage.handleResize(), 300);
+  window.addEventListener('resize', () => nglStage && nglStage.handleResize());
+  new ResizeObserver(() => nglStage && nglStage.handleResize()).observe(stageEl);
+}
+
+async function loadIntoViewer() {
+  initNGL();
+  if (!nglStage) return;
+
+  const hasTraj = uploadedFiles.some(f => f.kind === 'trajectory');
+  const hasPdb  = uploadedFiles.some(f => f.name.toLowerCase().endsWith('.pdb'));
+  if (!hasTraj && !hasPdb) {
+    termLog('[viewer] No trajectory loaded — upload files or load test data first.', 't-warn');
+    return;
+  }
+
+  const btn = document.getElementById('loadViewerBtn');
+  btn.disabled = true;
+  btn.textContent = '⟳ Converting…';
+
+  nglStage.handleResize();
+  nglStage.removeAllComponents();
+  nglPlayer = null;
+  document.getElementById('playBtn').textContent = '▶ Play';
+  document.getElementById('frameCounter').textContent = '— / —';
+  document.getElementById('frameSlider').value = 0;
+
+  try {
+    const pdbTraj = uploadedFiles.find(f => f.kind === 'trajectory' && f.name.toLowerCase().endsWith('.pdb'));
+
+    if (pdbTraj) {
+      // Native PDB trajectory — load directly as multi-MODEL
+      termLog(`[viewer] Loading PDB trajectory ${pdbTraj.name}…`, 't-info');
+      nglComponent = await nglStage.loadFile(`/api/file/${encodeURIComponent(pdbTraj.name)}`, { ext: 'pdb' });
+      _applyRepr();
+      nglComponent.autoView();
+      const trajList = nglComponent.trajList;
+      if (trajList && trajList.length > 0) {
+        _setupPlayer(trajList[0]);
+      } else {
+        document.getElementById('frameCounter').textContent = '1 / 1';
+      }
+    } else {
+      // AMBER/binary — convert to PDB struct + DCD trajectory via cpptraj
+      termLog('[viewer] Converting via cpptraj (stripping solvent)…', 't-info');
+      const r = await fetch('/api/prepare_viewer', { method: 'POST' });
+      const d = await r.json();
+      if (!r.ok || !d.ok) {
+        termLog(`[viewer] Conversion failed: ${d.error || r.statusText}`, 't-error');
+        return;
+      }
+      termLog(`[viewer] Done → ${d.struct} + ${d.traj}`, 't-success');
+
+      termLog('[viewer] Loading structure…', 't-info');
+      nglComponent = await nglStage.loadFile(`/api/file/${encodeURIComponent(d.struct)}`, { ext: 'pdb' });
+      _applyRepr();
+      nglComponent.autoView();
+
+      termLog('[viewer] Attaching DCD trajectory…', 't-info');
+      const trajComp = await nglComponent.addTrajectory(`/api/file/${encodeURIComponent(d.traj)}`);
+      await new Promise(res => setTimeout(res, 300));
+      const traj = trajComp && trajComp.trajectory;
+      if (traj && traj.frameCount > 0) {
+        _setupPlayer(traj);
+      } else if (nglComponent.trajList && nglComponent.trajList.length > 0) {
+        _setupPlayer(nglComponent.trajList[0]);
+      } else {
+        document.getElementById('frameCounter').textContent = '1 / 1';
+      }
+    }
+
+    const emptyEl = document.getElementById('viewerEmpty');
+    if (emptyEl) emptyEl.style.display = 'none';
+    termLog('[viewer] ✓ Structure loaded successfully', 't-success');
+  } catch(e) {
+    termLog(`[viewer] Error: ${e.message}`, 't-error');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '⬡ Load into Viewer';
+  }
+}
+
+function _applyRepr() {
+  if (!nglComponent) return;
+  nglComponent.removeAllRepresentations();
+  const repr  = document.getElementById('reprSelect').value;
+  const color = document.getElementById('colorSelect').value;
+  nglComponent.addRepresentation(repr, { color });
+}
+
+function _setupPlayer(traj) {
+  nglTotalFrames = traj.frameCount;
+  const slider = document.getElementById('frameSlider');
+  slider.max   = Math.max(0, nglTotalFrames - 1);
+  slider.value = 0;
+  _updateFrameLabel(0);
+
+  nglPlayer = new NGL.TrajectoryPlayer(traj, {
+    step: 1, timeout: +document.getElementById('speedSlider').value,
+    start: 0, end: nglTotalFrames - 1,
+    mode: 'loop', direction: 'forward',
+  });
+
+  traj.signals.frameChanged.add(i => {
+    slider.value = i;
+    _updateFrameLabel(i);
+  });
+}
+
+function _updateFrameLabel(i) {
+  document.getElementById('frameCounter').textContent =
+    `${i + 1} / ${nglTotalFrames}`;
+}
+
+function viewerTogglePlay() {
+  if (!nglPlayer) return;
+  if (nglPlayer.isRunning) {
+    nglPlayer.pause();
+    document.getElementById('playBtn').textContent = '▶ Play';
+  } else {
+    nglPlayer.play();
+    document.getElementById('playBtn').textContent = '⏸ Pause';
+  }
+}
+
+function viewerSetFrame(i) {
+  if (!nglPlayer) return;
+  nglPlayer.pause();
+  document.getElementById('playBtn').textContent = '▶ Play';
+  nglPlayer.traj.setFrame(i);
+  _updateFrameLabel(i);
+}
+
+function viewerSetSpeed(ms) {
+  document.getElementById('speedLabel').textContent = `${ms} ms/frame`;
+  if (nglPlayer) nglPlayer.timeout = ms;
+}
+
+function viewerCenter() {
+  if (nglComponent) nglComponent.autoView(400);
+}
+
+function viewerSpin() {
+  if (!nglStage) return;
+  nglSpinning = !nglSpinning;
+  nglStage.setSpin(nglSpinning ? [0,1,0] : null);
+  document.getElementById('spinBtn').style.color = nglSpinning ? 'var(--accent)' : '';
+}
+
+function changeRepr() { _applyRepr(); }
+
+function viewerScreenshot() {
+  if (!nglStage) return;
+  nglStage.makeImage({ factor: 2, antialias: true, trim: false, transparent: false })
+    .then(blob => {
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'trajectory_frame.png';
+      a.click();
+    });
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// RESIZABLE PANELS
+// ─────────────────────────────────────────────────────────────────────────────
+(function() {
+  const MIN = 160;   // minimum panel width px
+
+  function initDivider(divider, getPanelA, getPanelB, sideA) {
+    // sideA: 'left' means dragging changes panelA width; 'right' changes panelB width
+    let startX, startW;
+
+    divider.addEventListener('mousedown', e => {
+      e.preventDefault();
+      startX = e.clientX;
+      startW = sideA === 'left'
+        ? getPanelA().getBoundingClientRect().width
+        : getPanelB().getBoundingClientRect().width;
+      divider.classList.add('dragging');
+      document.body.style.cursor = 'col-resize';
+      document.body.style.userSelect = 'none';
+
+      function onMove(e) {
+        const delta = e.clientX - startX;
+        if (sideA === 'left') {
+          const newW = Math.max(MIN, startW + delta);
+          getPanelA().style.width = newW + 'px';
+        } else {
+          const newW = Math.max(MIN, startW - delta);
+          getPanelB().style.width = newW + 'px';
+        }
+        // Notify NGL of resize
+        if (nglStage) nglStage.handleResize();
+      }
+
+      function onUp() {
+        divider.classList.remove('dragging');
+        document.body.style.cursor = '';
+        document.body.style.userSelect = '';
+        document.removeEventListener('mousemove', onMove);
+        document.removeEventListener('mouseup', onUp);
+        if (nglStage) nglStage.handleResize();
+      }
+
+      document.addEventListener('mousemove', onMove);
+      document.addEventListener('mouseup', onUp);
+    });
+  }
+
+  // Horizontal divider — resizes output file viewer height
+  (function() {
+    const divOutH = document.getElementById('divOutH');
+    let startY, startH;
+    divOutH.addEventListener('mousedown', e => {
+      e.preventDefault();
+      startY = e.clientY;
+      startH = document.getElementById('outfileViewer').getBoundingClientRect().height;
+      divOutH.classList.add('dragging');
+      document.body.style.cursor = 'row-resize';
+      document.body.style.userSelect = 'none';
+
+      function onMove(e) {
+        const delta = e.clientY - startY;
+        const newH = Math.max(60, Math.min(startH - delta, window.innerHeight - 200));
+        document.getElementById('outfileViewer').style.height = newH + 'px';
+      }
+      function onUp() {
+        divOutH.classList.remove('dragging');
+        document.body.style.cursor = '';
+        document.body.style.userSelect = '';
+        document.removeEventListener('mousemove', onMove);
+        document.removeEventListener('mouseup', onUp);
+      }
+      document.addEventListener('mousemove', onMove);
+      document.addEventListener('mouseup', onUp);
+    });
+  })();
+
+  // Horizontal divider — resizes terminal height
+  (function() {
+    const divH = document.getElementById('divH');
+    let startY, startH;
+    divH.addEventListener('mousedown', e => {
+      e.preventDefault();
+      startY = e.clientY;
+      startH = document.querySelector('.terminal').getBoundingClientRect().height;
+      divH.classList.add('dragging');
+      document.body.style.cursor = 'row-resize';
+      document.body.style.userSelect = 'none';
+
+      function onMove(e) {
+        const delta = e.clientY - startY;
+        const newH = Math.max(60, Math.min(startH - delta, window.innerHeight - 200));
+        document.querySelector('.terminal').style.height = newH + 'px';
+      }
+      function onUp() {
+        divH.classList.remove('dragging');
+        document.body.style.cursor = '';
+        document.body.style.userSelect = '';
+        document.removeEventListener('mousemove', onMove);
+        document.removeEventListener('mouseup', onUp);
+      }
+      document.addEventListener('mousemove', onMove);
+      document.addEventListener('mouseup', onUp);
+    });
+  })();
+
+  initDivider(
+    document.getElementById('divL'),
+    () => document.querySelector('.panel-left'),
+    () => document.querySelector('.panel-center'),
+    'left'
+  );
+
+  initDivider(
+    document.getElementById('divR'),
+    () => document.querySelector('.panel-center'),
+    () => document.querySelector('.panel-right'),
+    'right'
+  );
+})();
+</script>
+</body>
+</html>

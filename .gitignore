@@ -1,0 +1,27 @@
+# Environment
+.env
+*.env
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.egg-info/
+dist/
+build/
+.venv/
+venv/
+env/
+
+# Data files (large binaries)
+test_data/*.nc
+test_data/*.prmtop
+Test/
+
+# Sensitive
+resume.txt
+
+# OS
+.DS_Store
+*.swp
