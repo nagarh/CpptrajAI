@@ -1475,10 +1475,11 @@ async function refreshOutputFiles() {
     }
 
     list.innerHTML = files.map(f => {
-      const sel = selectedOutfile === f.name ? 'sel' : '';
-      const sz  = f.size > 1024 ? (f.size/1024).toFixed(1)+'KB' : f.size+'B';
+      const sel  = selectedOutfile === f.name ? 'sel' : '';
+      const sz   = f.size > 1024 ? (f.size/1024).toFixed(1)+'KB' : f.size+'B';
+      const icon = f.name.match(/\.(png|jpg|jpeg|svg)$/i) ? '🖼️' : '📄';
       return `<div class="outfile-item ${sel}" onclick="viewOutputFile('${f.name}')">
-        <span style="font-size:14px">📄</span>
+        <span style="font-size:14px">${icon}</span>
         <span class="outfile-name">${f.name}</span>
         <span class="outfile-size">${sz}</span>
       </div>`;
@@ -1495,22 +1496,36 @@ async function viewOutputFile(name) {
   const nameEl  = document.getElementById('outfileViewerName');
   const dlBtn   = document.getElementById('outfileDlBtn');
 
-  try {
-    const r    = await fetch(`/api/file/${encodeURIComponent(name)}`);
-    const text = await r.text();
-    viewer.style.display  = 'flex';
-    document.getElementById('divOutH').style.display = 'block';
-    nameEl.textContent    = name;
-    content.textContent   = text.slice(0, 4000) + (text.length > 4000 ? '\n… (truncated)' : '');
+  viewer.style.display = 'flex';
+  document.getElementById('divOutH').style.display = 'block';
+  nameEl.textContent = name;
 
+  const isImage = name.match(/\.(png|jpg|jpeg|svg)$/i);
+
+  if (isImage) {
+    // Show image inline with a cache-busting timestamp
+    const url = `/api/file/${encodeURIComponent(name)}?t=${Date.now()}`;
+    content.innerHTML = `<img src="${url}" style="max-width:100%;border-radius:6px;display:block;margin:auto" alt="${name}">`;
     dlBtn.onclick = () => {
-      const blob = new Blob([text], {type:'text/plain'});
       const a = document.createElement('a');
-      a.href = URL.createObjectURL(blob);
+      a.href = url;
       a.download = name;
       a.click();
     };
-  } catch(e) {}
+  } else {
+    try {
+      const r    = await fetch(`/api/file/${encodeURIComponent(name)}`);
+      const text = await r.text();
+      content.textContent = text.slice(0, 4000) + (text.length > 4000 ? '\n… (truncated)' : '');
+      dlBtn.onclick = () => {
+        const blob = new Blob([text], {type:'text/plain'});
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = name;
+        a.click();
+      };
+    } catch(e) {}
+  }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

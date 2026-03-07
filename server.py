@@ -242,6 +242,12 @@ def get_file(name):
     if not fp.exists():
         return jsonify({"error": "Not found"}), 404
     from flask import send_file
+    suffix = fp.suffix.lower()
+    mime_map = {".png": "image/png", ".jpg": "image/jpeg",
+                ".jpeg": "image/jpeg", ".svg": "image/svg+xml"}
+    mime = mime_map.get(suffix)
+    if mime:
+        return send_file(fp, mimetype=mime, as_attachment=False)
     return send_file(fp, as_attachment=False)
 
 
