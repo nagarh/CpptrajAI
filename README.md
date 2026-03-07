@@ -9,7 +9,7 @@ An AI-powered IDE for molecular dynamics trajectory analysis using **cpptraj** a
 ## Features
 
 - **IDE-style interface** — three-panel layout (command reference | script editor + AI chat | file manager)
-- **AI Agent + RAG** — describe analysis in plain English, AI writes and runs the cpptraj script
+- **AI Agent + RAG** — prompt the AI for any analysis, it writes and runs the cpptraj script automatically
 - **Multi-provider AI** — Claude, OpenAI, Gemini (cloud) or Ollama/qwen2.5-coder (local, free)
 - **Script Editor** — write/edit cpptraj scripts with syntax hints and one-click execution
 - **Script Builder** — GUI builder for common analyses (RMSD, RMSF, clustering, PCA, etc.)
@@ -124,7 +124,7 @@ CpptrajGPT/
 
 ### How AI + RAG works
 
-1. User describes the analysis in plain English
+1. User provides a prompt describing the desired analysis
 2. TF-IDF retrieval finds the most relevant cpptraj documentation chunks
 3. Retrieved docs are injected as context into the AI prompt
 4. AI writes a cpptraj script using its tools (`run_cpptraj_script`, `read_output_file`)
