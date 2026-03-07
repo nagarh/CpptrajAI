@@ -49,10 +49,10 @@ _agent: TrajectoryAgent | None = None
 
 # Active LLM config (overridable at runtime via /api/set_provider)
 _llm_config: dict = {
-    "provider": os.environ.get("LLM_PROVIDER", "claude"),
-    "api_key":  "",   # must be entered via IDE Settings — not read from environment
-    "model":    os.environ.get("LLM_MODEL", ""),
-    "base_url": os.environ.get("LLM_BASE_URL", ""),
+    "provider": "claude",
+    "api_key":  "",
+    "model":    "",
+    "base_url": "",
 }
 
 

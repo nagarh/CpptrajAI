@@ -1955,10 +1955,10 @@ async function refreshStatus() {
 
     document.getElementById('lbl-cpptraj').textContent = data.cpptraj ? 'cpptraj' : 'cpptraj missing';
     document.getElementById('lbl-parm').textContent    = data.parm ? data.parm : 'no topology';
-    const provLabel = data.provider ? `${data.provider}${data.model ? ' · '+data.model : ''}` : 'no LLM';
-    document.getElementById('lbl-api').textContent     = data.api_key ? provLabel : 'no LLM set';
+    const provLabel = data.provider ? `${data.provider}${data.model ? ' · '+data.model : ''}` : 'No AI model selected';
+    document.getElementById('lbl-api').textContent     = data.api_key ? provLabel : 'No AI model selected';
     const badge = document.getElementById('activeModelBadge');
-    if (badge) badge.textContent = data.api_key && data.model ? `${data.model} · RAG` : '(no model set) · RAG';
+    if (badge) badge.textContent = data.api_key && data.model ? `${data.model} · RAG` : 'No AI model selected · RAG';
   } catch {
     // Server not up yet
   }

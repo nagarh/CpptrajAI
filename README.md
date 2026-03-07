@@ -1,31 +1,39 @@
-# CPPTRAJ Agent
+# CpptrajGPT
 
-A Streamlit app for interactive MD trajectory analysis powered by **cpptraj** and **Claude AI**.
+An AI-powered IDE for molecular dynamics trajectory analysis using **cpptraj** and large language models with RAG (Retrieval-Augmented Generation).
+
+![IDE](agent_ide.html)
+
+---
 
 ## Features
 
-| Tab | Description |
-|-----|-------------|
-| **Setup** | Upload topology (.prmtop, .psf, .gro) and trajectory (.nc, .dcd, .xtc) files |
-| **Documentation** | Full searchable reference for all cpptraj commands with examples |
-| **Script Builder** | GUI-based analysis builder — configure analyses with checkboxes/sliders and auto-generate scripts |
-| **Script Editor** | Raw cpptraj script editor with syntax highlighting, execute and inspect output |
-| **AI Agent** | Conversational AI (Claude) — describe what you want in plain English, the agent writes and runs the script |
-| **Results** | Interactive plotting of output data files with Plotly |
+- **IDE-style interface** — three-panel layout (command reference | script editor + AI chat | file manager)
+- **AI Agent + RAG** — describe analysis in plain English, AI writes and runs the cpptraj script
+- **Multi-provider AI** — Claude, OpenAI, Gemini (cloud) or Ollama/qwen2.5-coder (local, free)
+- **Script Editor** — write/edit cpptraj scripts with syntax hints and one-click execution
+- **Script Builder** — GUI builder for common analyses (RMSD, RMSF, clustering, PCA, etc.)
+- **Results Viewer** — interactive Plotly plots of output data files
+- **3D Viewer** — molecular structure visualization (NGL)
+- **Command Reference** — searchable cpptraj documentation with examples
+
+---
 
 ## Quick Start
 
-### 1. Install dependencies
+### 1. Clone and install dependencies
 
 ```bash
+git clone https://github.com/nagarh/CpptrajGPT.git
+cd CpptrajGPT
 pip install -r requirements.txt
 ```
 
 ### 2. Install cpptraj
 
-cpptraj must be installed and on your PATH.
+cpptraj must be installed and available on your PATH.
 
-**AMBER users:** cpptraj ships with AmberTools (free via conda):
+**Via conda (recommended):**
 ```bash
 conda install -c conda-forge ambertools
 ```
@@ -36,48 +44,92 @@ git clone https://github.com/Amber-MD/cpptraj.git
 cd cpptraj && ./configure gnu && make -j4 install
 ```
 
-### 3. Set up API key
+### 3. Choose your AI backend
 
+#### Option A — Local AI (Free, No API key, GPU or CPU)
+
+Best for researchers who want full privacy and no cost.
+
+**Step 1: Install Ollama**
 ```bash
-cp .env.example .env
-# Edit .env and add your Anthropic API key
+# Linux / macOS
+curl -fsSL https://ollama.com/install.sh | sh
+
+# Windows: download installer from https://ollama.com/download
 ```
 
-Or enter it directly in the sidebar.
+**Step 2: Pull the model**
+```bash
+ollama pull qwen2.5-coder:7b
+```
 
-### 4. Run
+> **Requirements:** ~8GB RAM. Works on CPU (slower) or GPU (faster). Ollama automatically detects and uses GPU if available, otherwise falls back to CPU.
+
+**Step 3: Start Ollama** (if not already running)
+```bash
+ollama serve
+```
+
+#### Option B — Cloud AI (API key required)
+
+| Provider | Where to get key | Notes |
+|----------|-----------------|-------|
+| **Anthropic (Claude)** | [console.anthropic.com](https://console.anthropic.com) | Best quality |
+| **OpenAI (GPT-4o)** | [platform.openai.com](https://platform.openai.com) | Widely used |
+| **Google (Gemini)** | [aistudio.google.com](https://aistudio.google.com) | Free tier available |
+
+No setup needed — just enter your API key in the IDE Settings (⚙ icon).
+
+### 4. Run the IDE
 
 ```bash
-cd CPPTRAJ_Agent
-streamlit run app.py
+python server.py
 ```
+
+Open your browser at **http://localhost:8502**
+
+---
+
+## Setting up AI in the IDE
+
+1. Click the **⚙ Settings** button in the top-right of the IDE
+2. Select your provider (Claude / OpenAI / Gemini / Ollama)
+3. Enter your API key (not needed for Ollama)
+4. Select a model and click **Save**
+
+---
 
 ## Architecture
 
 ```
-CPPTRAJ_Agent/
-├── app.py                  # Streamlit UI (6 tabs)
+CpptrajGPT/
+├── server.py               # Flask backend (API endpoints)
+├── agent_ide.html          # Frontend IDE (HTML/CSS/JS)
 ├── core/
+│   ├── agent.py            # AI agent with tool use
 │   ├── knowledge_base.py   # cpptraj docs + TF-IDF RAG retrieval
-│   ├── agent.py            # Claude AI agent with tool use
+│   ├── llm_backends.py     # Claude / OpenAI / Gemini / Ollama backends
 │   └── runner.py           # cpptraj subprocess execution
+├── test_data/              # Sample topology and trajectory for testing
 ├── requirements.txt
 └── .env.example
 ```
 
-### AI Agent + RAG
+### How AI + RAG works
 
-1. User writes a natural language query
-2. TF-IDF retrieval finds the most relevant cpptraj documentation
-3. Retrieved docs are injected as context into Claude's prompt
-4. Claude writes a cpptraj script using its tools (`run_cpptraj_script`, `read_output_file`)
-5. The script is executed and results are returned to Claude
-6. Claude interprets and summarizes the results
+1. User describes the analysis in plain English
+2. TF-IDF retrieval finds the most relevant cpptraj documentation chunks
+3. Retrieved docs are injected as context into the AI prompt
+4. AI writes a cpptraj script using its tools (`run_cpptraj_script`, `read_output_file`)
+5. Script is executed and results returned to the AI
+6. AI interprets and summarizes the results
 
-### Supported Analyses
+---
+
+## Supported Analyses
 
 - RMSD (backbone, per-residue)
-- RMSF / atomic fluctuation
+- RMSF / atomic fluctuation (B-factors)
 - Radius of gyration
 - Hydrogen bond analysis
 - Secondary structure (DSSP)
@@ -88,9 +140,9 @@ CPPTRAJ_Agent/
 - Density profiles
 - Diffusion / MSD
 - Water shell analysis
-- SASA
-- Volumetric maps
-- Ring pucker
+- SASA (solvent-accessible surface area)
+- Volumetric density maps
+- Ring pucker analysis
 
 ## Supported File Formats
 
@@ -98,4 +150,3 @@ CPPTRAJ_Agent/
 |------|---------|
 | Topology | `.prmtop` `.parm7` `.psf` `.pdb` `.gro` `.mol2` |
 | Trajectory | `.nc` `.ncdf` `.dcd` `.xtc` `.trr` `.crd` `.mdcrd` |
-| Reference | `.pdb` `.rst7` `.nc` |
