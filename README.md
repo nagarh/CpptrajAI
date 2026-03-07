@@ -135,21 +135,22 @@ CpptrajGPT/
 
 ## Supported Analyses
 
-- RMSD (backbone, per-residue)
-- RMSF / atomic fluctuation (B-factors)
-- Radius of gyration
-- Hydrogen bond analysis
-- Secondary structure (DSSP)
-- Distance, angle, dihedral angles
-- Trajectory clustering (HierAgglo, K-means, DBSCAN)
-- Principal Component Analysis (PCA)
-- Native contacts (Q-value)
-- Density profiles
-- Diffusion / MSD
-- Water shell analysis
-- SASA (solvent-accessible surface area)
-- Volumetric density maps
-- Ring pucker analysis
+CpptrajGPT supports **all 154+ cpptraj commands** via RAG — the full cpptraj manual is indexed and retrieved at query time, so any analysis cpptraj can perform can be requested via prompt.
+
+Common examples include:
+
+| Category | Analyses |
+|----------|----------|
+| **Structural** | RMSD, RMSF, radius of gyration, SASA, distance, angle, dihedral |
+| **Dynamics** | Diffusion/MSD, atomic fluctuation (B-factors), covariance matrix |
+| **Clustering** | HierAgglo, K-means, DBSCAN |
+| **Dimensionality reduction** | PCA (matrix + projection) |
+| **Interactions** | Hydrogen bonds, native contacts (Q-value), water shell |
+| **Secondary structure** | DSSP per-residue and per-frame |
+| **Density & maps** | Volumetric density maps, density profiles |
+| **Specialized** | Ring pucker, multidihedral (φ/ψ/χ), trajectory imaging, stripping |
+
+Any command not listed above can still be used — just prompt the AI and it will look it up from the cpptraj manual automatically.
 
 ## Supported File Formats
 
