@@ -223,11 +223,32 @@ class TrajectoryAgent:
     @staticmethod
     def _compress_result(result: str) -> str:
         """Trim tool result stored in history to save tokens."""
-        if len(result) <= 600:
+        if len(result) <= 200:
             return result
         lines = result.splitlines()
-        head = "\n".join(lines[:20])
+        head = "\n".join(lines[:8])
         return f"{head}\n… [{len(lines)} lines total, truncated]"
+
+    def _safe_trim(self, history: list) -> list:
+        """Emergency trim if total history exceeds ~120k chars (~30k tokens)."""
+        total = sum(len(str(m.get("content", ""))) for m in history)
+        if total <= 120_000:
+            return history
+        # Keep only last 2 real user turns
+        real_user_idx = []
+        for i, msg in enumerate(history):
+            if msg["role"] != "user":
+                continue
+            content = msg.get("content", "")
+            if isinstance(content, str):
+                real_user_idx.append(i)
+            elif isinstance(content, list):
+                if any(not (isinstance(b, dict) and b.get("type") == "tool_result")
+                       for b in content):
+                    real_user_idx.append(i)
+        if len(real_user_idx) >= 2:
+            return history[real_user_idx[-2]:]
+        return history[-4:]  # fallback: last 4 messages
 
     def _build_file_context(self) -> str:
         parts = ["## Available Files"]
@@ -347,7 +368,7 @@ class TrajectoryAgent:
             stop_reason = "end_turn"
 
             for event_type, data in backend.stream_chat(
-                    self._trim_history(self.conversation_history), TOOLS, SYSTEM_PROMPT):
+                    self._safe_trim(self._trim_history(self.conversation_history)), TOOLS, SYSTEM_PROMPT):
                 if event_type == "text":
                     text_acc.append(data)
                     yield {"type": "text", "chunk": data}
@@ -395,13 +416,13 @@ class TrajectoryAgent:
         while True:
             try:
                 text, tool_calls, has_tool_use = backend.chat(
-                    self._trim_history(self.conversation_history), TOOLS, SYSTEM_PROMPT)
+                    self._safe_trim(self._trim_history(self.conversation_history)), TOOLS, SYSTEM_PROMPT)
             except Exception as e:
                 if "tool_use" in str(e) or "tool_result" in str(e):
                     last = self.conversation_history[-1]
                     self.conversation_history = [last]
                     text, tool_calls, has_tool_use = backend.chat(
-                        self._trim_history(self.conversation_history), TOOLS, SYSTEM_PROMPT)
+                        self._safe_trim(self._trim_history(self.conversation_history)), TOOLS, SYSTEM_PROMPT)
                 else:
                     raise
 
