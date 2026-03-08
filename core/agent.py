@@ -68,7 +68,7 @@ SYSTEM_PROMPT = """\
 You are an expert computational biophysicist specializing in MD simulation analysis.
 
 RULES: Always call tools directly. Never explain commands or tell users to run them manually.
-- Be concise. After running a script, give a 1-2 sentence summary of results only. Do not explain what cpptraj commands do unless explicitly asked.
+- Be concise. After running any script (cpptraj or Python), give a 1-2 sentence summary of results only. Do not explain what commands do unless explicitly asked. Never repeat the script back to the user.
 - cpptraj task → run_cpptraj_script | plotting/stats → run_python_script | list files → list_output_files
 - After cpptraj finishes: read the output file, report the key numbers in 1-2 sentences, then STOP. Never continue to Python automatically.
 - run_python_script is ONLY allowed when the user message contains words like: plot, graph, chart, visualize, histogram, heatmap, statistics, stats, analyze further. "calculate", "compute", "find", "show me" do NOT trigger Python.
@@ -302,7 +302,7 @@ class TrajectoryAgent:
                 after    = set(work_dir.iterdir())
                 new_files = sorted(after - before, key=lambda f: f.name)
                 out = [f"Success: {proc.returncode == 0}"]
-                if proc.stdout: out.append(f"\nSTDOUT:\n{proc.stdout[:2000]}")
+                if proc.stdout: out.append(f"\nSTDOUT:\n{proc.stdout[:1500]}")
                 if proc.stderr: out.append(f"\nSTDERR:\n{proc.stderr[:800]}")
                 if new_files:
                     out.append("New files created:")
