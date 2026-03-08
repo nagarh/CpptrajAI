@@ -244,7 +244,9 @@ def get_file(name):
     from flask import send_file
     suffix = fp.suffix.lower()
     mime_map = {".png": "image/png", ".jpg": "image/jpeg",
-                ".jpeg": "image/jpeg", ".svg": "image/svg+xml"}
+                ".jpeg": "image/jpeg", ".svg": "image/svg+xml",
+                ".dcd": "application/octet-stream",
+                ".pdb": "chemical/x-pdb"}
     mime = mime_map.get(suffix)
     if mime:
         return send_file(fp, mimetype=mime, as_attachment=False)
@@ -267,37 +269,45 @@ def status():
 
 @app.route("/api/prepare_viewer", methods=["POST"])
 def prepare_viewer():
-    """Convert uploaded topology+trajectory to a multi-MODEL PDB for NGL viewer."""
+    """Convert topology+trajectory to PDB structure + DCD trajectory for NGL viewer."""
     if not parm_file or not traj_files:
         return jsonify({"error": "Upload topology and trajectory first."}), 400
 
-    out_pdb = WORK_DIR / "viewer_traj.pdb"
+    out_pdb = WORK_DIR / "viewer_struct.pdb"
+    out_dcd = WORK_DIR / "viewer_traj.dcd"
 
-    out_pdb = WORK_DIR / "viewer_traj.pdb"
+    strip_res = ",".join([":WAT", ":HOH", ":TIP3", ":Na+", ":Cl-", ":NA", ":CL"])
 
-    # Write all frames as a single multi-MODEL PDB (NGL reads MODEL records natively)
     script = f"""parm {parm_file}
 trajin {traj_files[0]}
-strip :WAT,Na+,Cl-,HOH
+strip {strip_res}
 autoimage
-trajout {out_pdb} pdb
+trajout {out_pdb} pdb onlyframes 1
+trajout {out_dcd} dcd
 go"""
     result = runner.run_script(script)
 
-    if not out_pdb.exists() or out_pdb.stat().st_size == 0:
-        # Retry without strip
+    if not out_dcd.exists() or out_dcd.stat().st_size == 0:
+        # Retry without strip (some topologies have different residue names)
         script2 = f"""parm {parm_file}
 trajin {traj_files[0]}
 autoimage
-trajout {out_pdb} pdb
+trajout {out_pdb} pdb onlyframes 1
+trajout {out_dcd} dcd
 go"""
         result = runner.run_script(script2)
 
-    if out_pdb.exists() and out_pdb.stat().st_size > 0:
-        # Count MODEL records to report frame count
-        text = out_pdb.read_text(errors="ignore")
-        frames = text.count("\nMODEL ") or text.count("MODEL ") or 1
-        return jsonify({"ok": True, "filename": "viewer_traj.pdb", "frames": frames})
+    if out_pdb.exists() and out_dcd.exists() and out_dcd.stat().st_size > 0:
+        # Count frames from DCD header (bytes 8-11 = frame count in DCD)
+        try:
+            raw = out_dcd.read_bytes()
+            import struct as _struct
+            frames = _struct.unpack_from('<i', raw, 8)[0]
+        except Exception:
+            frames = len(traj_files)
+        return jsonify({"ok": True, "struct": "viewer_struct.pdb",
+                        "traj": "viewer_traj.dcd", "frames": frames})
+
     err = result.get("stderr") or result.get("stdout") or "cpptraj conversion failed."
     return jsonify({"ok": False, "error": err[:500]}), 500
 

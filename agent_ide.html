@@ -2219,7 +2219,7 @@ async function loadIntoViewer() {
         termLog(`[viewer] Conversion failed: ${d.error || r.statusText}`, 't-error');
         return;
       }
-      termLog(`[viewer] Done → ${d.struct} + ${d.traj}`, 't-success');
+      termLog(`[viewer] Done — ${d.frames} frames, loading…`, 't-success');
 
       termLog('[viewer] Loading structure…', 't-info');
       nglComponent = await nglStage.loadFile(`/api/file/${encodeURIComponent(d.struct)}`, { ext: 'pdb' });
@@ -2227,15 +2227,14 @@ async function loadIntoViewer() {
       nglComponent.autoView();
 
       termLog('[viewer] Attaching DCD trajectory…', 't-info');
-      const trajComp = await nglComponent.addTrajectory(`/api/file/${encodeURIComponent(d.traj)}`);
-      await new Promise(res => setTimeout(res, 300));
-      const traj = trajComp && trajComp.trajectory;
-      if (traj && traj.frameCount > 0) {
+      await nglComponent.addTrajectory(`/api/file/${encodeURIComponent(d.traj)}`, { ext: 'dcd' });
+      await new Promise(res => setTimeout(res, 500));
+
+      const traj = nglComponent.trajList && nglComponent.trajList[0];
+      if (traj) {
         _setupPlayer(traj);
-      } else if (nglComponent.trajList && nglComponent.trajList.length > 0) {
-        _setupPlayer(nglComponent.trajList[0]);
       } else {
-        document.getElementById('frameCounter').textContent = '1 / 1';
+        document.getElementById('frameCounter').textContent = `1 / ${d.frames}`;
       }
     }
 
