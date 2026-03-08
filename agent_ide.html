@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>CpptrajGPT — Molecular Dynamics Analysis Studio</title>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
-<script src="https://unpkg.com/ngl@2.0.0-dev.37/dist/ngl.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/3Dmol/2.1.0/3Dmol-min.js"></script>
 <style>
   :root {
     --bg: #0d1117;
@@ -2146,101 +2146,79 @@ document.getElementById('tab-viewer').style.display = 'none';
 // ─────────────────────────────────────────────────────────────────────────────
 // TRAJECTORY VIEWER  (NGL WebGL)
 // ─────────────────────────────────────────────────────────────────────────────
-let nglStage       = null;
-let nglComponent   = null;
-let nglPlayer      = null;
-let nglTotalFrames = 0;
 let nglSpinning    = false;
 
-function initNGL() {
-  if (typeof NGL === 'undefined') {
+// ── 3Dmol.js viewer state ─────────────────────────────────────────────────────
+let mol3dViewer   = null;
+let mol3dFrames   = 0;
+let mol3dCurrent  = 0;
+let mol3dPlaying  = false;
+let mol3dTimer    = null;
+
+function _init3Dmol() {
+  if (mol3dViewer) return;
+  if (typeof $3Dmol === 'undefined') {
     document.getElementById('viewerEmpty').innerHTML =
-      '<div style="font-size:28px">⚠</div><div>NGL library failed to load.<br>Check your internet connection.</div>';
+      '<div style="font-size:28px">⚠</div><div>3Dmol library failed to load.<br>Check internet connection.</div>';
     return;
   }
-  const stageEl = document.getElementById('ngl-stage');
-  if (nglStage) {
-    // Already initialised — just fix canvas size
-    setTimeout(() => nglStage.handleResize(), 0);
-    return;
-  }
+  const el = document.getElementById('ngl-stage');
   document.getElementById('viewerEmpty').style.display = 'none';
-  nglStage = new NGL.Stage(stageEl, { backgroundColor: '#0d1117', tooltip: false });
-  // Force correct size after first paint and on any container resize
-  setTimeout(() => nglStage.handleResize(), 50);
-  setTimeout(() => nglStage.handleResize(), 300);
-  window.addEventListener('resize', () => nglStage && nglStage.handleResize());
-  new ResizeObserver(() => nglStage && nglStage.handleResize()).observe(stageEl);
+  mol3dViewer = $3Dmol.createViewer(el, { backgroundColor: '#0d1117', antialias: true });
 }
 
 async function loadIntoViewer() {
-  initNGL();
-  if (!nglStage) return;
-
   const hasTraj = uploadedFiles.some(f => f.kind === 'trajectory');
   const hasPdb  = uploadedFiles.some(f => f.name.toLowerCase().endsWith('.pdb'));
   if (!hasTraj && !hasPdb) {
-    termLog('[viewer] No trajectory loaded — upload files or load test data first.', 't-warn');
+    termLog('[viewer] No trajectory loaded — upload files first.', 't-warn');
     return;
   }
 
   const btn = document.getElementById('loadViewerBtn');
   btn.disabled = true;
   btn.textContent = '⟳ Converting…';
-
-  nglStage.handleResize();
-  nglStage.removeAllComponents();
-  nglPlayer = null;
+  _stopAnim();
   document.getElementById('playBtn').textContent = '▶ Play';
   document.getElementById('frameCounter').textContent = '— / —';
   document.getElementById('frameSlider').value = 0;
 
   try {
-    const pdbTraj = uploadedFiles.find(f => f.kind === 'trajectory' && f.name.toLowerCase().endsWith('.pdb'));
+    let pdbText = null;
 
+    const pdbTraj = uploadedFiles.find(f => f.name.toLowerCase().endsWith('.pdb'));
     if (pdbTraj) {
-      // Native PDB trajectory — load directly as multi-MODEL
-      termLog(`[viewer] Loading PDB trajectory ${pdbTraj.name}…`, 't-info');
-      nglComponent = await nglStage.loadFile(`/api/file/${encodeURIComponent(pdbTraj.name)}`, { ext: 'pdb' });
-      _applyRepr();
-      nglComponent.autoView();
-      const trajList = nglComponent.trajList;
-      if (trajList && trajList.length > 0) {
-        _setupPlayer(trajList[0]);
-      } else {
-        document.getElementById('frameCounter').textContent = '1 / 1';
-      }
+      termLog(`[viewer] Loading PDB ${pdbTraj.name}…`, 't-info');
+      pdbText = await (await fetch(`/api/file/${encodeURIComponent(pdbTraj.name)}`)).text();
     } else {
-      // AMBER/binary — convert to PDB struct + DCD trajectory via cpptraj
       termLog('[viewer] Converting via cpptraj (stripping solvent)…', 't-info');
       const r = await fetch('/api/prepare_viewer', { method: 'POST' });
       const d = await r.json();
-      if (!r.ok || !d.ok) {
-        termLog(`[viewer] Conversion failed: ${d.error || r.statusText}`, 't-error');
-        return;
-      }
+      if (!r.ok || !d.ok) { termLog(`[viewer] Conversion failed: ${d.error}`, 't-error'); return; }
       termLog(`[viewer] Done — ${d.frames} frames, loading…`, 't-success');
-
-      termLog('[viewer] Loading structure…', 't-info');
-      nglComponent = await nglStage.loadFile(`/api/file/${encodeURIComponent(d.struct)}`, { ext: 'pdb' });
-      _applyRepr();
-      nglComponent.autoView();
-
-      termLog('[viewer] Attaching DCD trajectory…', 't-info');
-      await nglComponent.addTrajectory(`/api/file/${encodeURIComponent(d.traj)}`, { ext: 'dcd' });
-      await new Promise(res => setTimeout(res, 500));
-
-      const traj = nglComponent.trajList && nglComponent.trajList[0];
-      if (traj) {
-        _setupPlayer(traj);
-      } else {
-        document.getElementById('frameCounter').textContent = `1 / ${d.frames}`;
-      }
+      pdbText = await (await fetch(`/api/file/${encodeURIComponent(d.filename)}`)).text();
     }
 
-    const emptyEl = document.getElementById('viewerEmpty');
-    if (emptyEl) emptyEl.style.display = 'none';
-    termLog('[viewer] ✓ Structure loaded successfully', 't-success');
+    _init3Dmol();
+    if (!mol3dViewer) return;
+    mol3dViewer.clear();
+
+    // Load all frames as models
+    mol3dViewer.addModelsAsFrames(pdbText, 'pdb');
+    mol3dFrames  = mol3dViewer.getNumFrames();
+    mol3dCurrent = 0;
+
+    _applyRepr3d();
+    mol3dViewer.zoomTo();
+    mol3dViewer.setFrame(0);
+    mol3dViewer.render();
+
+    const slider = document.getElementById('frameSlider');
+    slider.max   = Math.max(0, mol3dFrames - 1);
+    slider.value = 0;
+    document.getElementById('frameCounter').textContent = `1 / ${mol3dFrames}`;
+    document.getElementById('viewerEmpty').style.display = 'none';
+    termLog(`[viewer] ✓ Loaded ${mol3dFrames} frame(s)`, 't-success');
   } catch(e) {
     termLog(`[viewer] Error: ${e.message}`, 't-error');
   } finally {
@@ -2249,84 +2227,84 @@ async function loadIntoViewer() {
   }
 }
 
-function _applyRepr() {
-  if (!nglComponent) return;
-  nglComponent.removeAllRepresentations();
+function _applyRepr3d() {
+  if (!mol3dViewer) return;
   const repr  = document.getElementById('reprSelect').value;
   const color = document.getElementById('colorSelect').value;
-  nglComponent.addRepresentation(repr, { color });
+  mol3dViewer.setStyle({}, _buildStyle3d(repr, color));
+  mol3dViewer.render();
 }
 
-function _setupPlayer(traj) {
-  nglTotalFrames = traj.frameCount;
-  const slider = document.getElementById('frameSlider');
-  slider.max   = Math.max(0, nglTotalFrames - 1);
-  slider.value = 0;
-  _updateFrameLabel(0);
-
-  nglPlayer = new NGL.TrajectoryPlayer(traj, {
-    step: 1, timeout: +document.getElementById('speedSlider').value,
-    start: 0, end: nglTotalFrames - 1,
-    mode: 'loop', direction: 'forward',
-  });
-
-  traj.signals.frameChanged.add(i => {
-    slider.value = i;
-    _updateFrameLabel(i);
-  });
+function _buildStyle3d(repr, color) {
+  const c = color === 'chainname' ? 'chain' : color === 'residueindex' ? 'residueIndex' : color;
+  if (repr === 'cartoon')    return { cartoon: { color: c } };
+  if (repr === 'ball+stick') return { stick: {}, sphere: { scale: 0.3 } };
+  if (repr === 'surface')    return { surface: { opacity: 0.7, color: c } };
+  if (repr === 'licorice')   return { stick: { color: c } };
+  if (repr === 'spacefill')  return { sphere: { color: c } };
+  return { cartoon: { color: c } };
 }
 
-function _updateFrameLabel(i) {
-  document.getElementById('frameCounter').textContent =
-    `${i + 1} / ${nglTotalFrames}`;
+function _stopAnim() {
+  mol3dPlaying = false;
+  if (mol3dTimer) { clearInterval(mol3dTimer); mol3dTimer = null; }
 }
 
 function viewerTogglePlay() {
-  if (!nglPlayer) return;
-  if (nglPlayer.isRunning) {
-    nglPlayer.pause();
+  if (!mol3dViewer || mol3dFrames < 2) return;
+  if (mol3dPlaying) {
+    _stopAnim();
     document.getElementById('playBtn').textContent = '▶ Play';
   } else {
-    nglPlayer.play();
+    mol3dPlaying = true;
     document.getElementById('playBtn').textContent = '⏸ Pause';
+    const ms = +document.getElementById('speedSlider').value;
+    mol3dTimer = setInterval(() => {
+      mol3dCurrent = (mol3dCurrent + 1) % mol3dFrames;
+      mol3dViewer.setFrame(mol3dCurrent);
+      mol3dViewer.render();
+      document.getElementById('frameSlider').value = mol3dCurrent;
+      document.getElementById('frameCounter').textContent = `${mol3dCurrent + 1} / ${mol3dFrames}`;
+    }, ms);
   }
 }
 
 function viewerSetFrame(i) {
-  if (!nglPlayer) return;
-  nglPlayer.pause();
+  if (!mol3dViewer) return;
+  _stopAnim();
   document.getElementById('playBtn').textContent = '▶ Play';
-  nglPlayer.traj.setFrame(i);
-  _updateFrameLabel(i);
+  mol3dCurrent = +i;
+  mol3dViewer.setFrame(mol3dCurrent);
+  mol3dViewer.render();
+  document.getElementById('frameCounter').textContent = `${mol3dCurrent + 1} / ${mol3dFrames}`;
 }
 
 function viewerSetSpeed(ms) {
   document.getElementById('speedLabel').textContent = `${ms} ms/frame`;
-  if (nglPlayer) nglPlayer.timeout = ms;
+  if (mol3dPlaying) { _stopAnim(); viewerTogglePlay(); }
 }
 
 function viewerCenter() {
-  if (nglComponent) nglComponent.autoView(400);
+  if (mol3dViewer) { mol3dViewer.zoomTo(); mol3dViewer.render(); }
 }
 
 function viewerSpin() {
-  if (!nglStage) return;
+  if (!mol3dViewer) return;
   nglSpinning = !nglSpinning;
-  nglStage.setSpin(nglSpinning ? [0,1,0] : null);
+  if (nglSpinning) mol3dViewer.spin('y', 1);
+  else mol3dViewer.spin(false);
   document.getElementById('spinBtn').style.color = nglSpinning ? 'var(--accent)' : '';
 }
 
-function changeRepr() { _applyRepr(); }
+function changeRepr() { _applyRepr3d(); }
 
 function viewerScreenshot() {
-  if (!nglStage) return;
-  nglStage.makeImage({ factor: 2, antialias: true, trim: false, transparent: false })
-    .then(blob => {
-      const a = document.createElement('a');
-      a.href = URL.createObjectURL(blob);
-      a.download = 'trajectory_frame.png';
-      a.click();
-    });
+  if (!mol3dViewer) return;
+  const uri = mol3dViewer.pngURI();
+  const a = document.createElement('a');
+  a.href = uri;
+  a.download = `frame_${mol3dCurrent + 1}.png`;
+  a.click();
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -2358,8 +2336,7 @@ function viewerScreenshot() {
           const newW = Math.max(MIN, startW - delta);
           getPanelB().style.width = newW + 'px';
         }
-        // Notify NGL of resize
-        if (nglStage) nglStage.handleResize();
+        if (mol3dViewer) mol3dViewer.resize();
       }
 
       function onUp() {
@@ -2368,7 +2345,7 @@ function viewerScreenshot() {
         document.body.style.userSelect = '';
         document.removeEventListener('mousemove', onMove);
         document.removeEventListener('mouseup', onUp);
-        if (nglStage) nglStage.handleResize();
+        if (mol3dViewer) mol3dViewer.resize();
       }
 
       document.addEventListener('mousemove', onMove);
