@@ -934,21 +934,17 @@
         <div class="viewer-row">
           <button class="btn btn-primary" style="font-size:11px;padding:4px 12px" onclick="loadIntoViewer()" id="loadViewerBtn">⬡ Load into Viewer</button>
           <select class="viewer-select" id="reprSelect" onchange="changeRepr()">
-            <option value="cartoon">Cartoon</option>
-            <option value="ball+stick">Ball+Stick</option>
-            <option value="licorice">Licorice</option>
-            <option value="backbone">Backbone</option>
+            <option value="cartoon" selected>Cartoon</option>
             <option value="surface">Surface</option>
-            <option value="ribbon">Ribbon</option>
-            <option value="rope">Rope</option>
-            <option value="line">Line</option>
+            <option value="spacefill">Spacefill</option>
+            <option value="ball+stick">Ball+Stick</option>
           </select>
           <select class="viewer-select" id="colorSelect" onchange="changeRepr()">
-            <option value="chainname">Chain</option>
-            <option value="residueindex">Residue</option>
-            <option value="element">Element</option>
-            <option value="bfactor">B-factor</option>
-            <option value="sstruc">SS</option>
+            <option value="spectrum" selected>Spectrum</option>
+            <option value="chain">Chain</option>
+            <option value="residueIndex">Residue#</option>
+            <option value="whiteCarbon">Element</option>
+            <option value="ssJmol">Secondary Str</option>
           </select>
           <button class="btn btn-ghost" style="font-size:11px;padding:4px 8px" onclick="viewerCenter()" title="Reset view">⊙</button>
           <button class="btn btn-ghost" style="font-size:11px;padding:4px 8px" onclick="viewerSpin()" id="spinBtn" title="Toggle spin">↻</button>
@@ -2231,18 +2227,26 @@ function _applyRepr3d() {
   if (!mol3dViewer) return;
   const repr  = document.getElementById('reprSelect').value;
   const color = document.getElementById('colorSelect').value;
-  mol3dViewer.setStyle({}, _buildStyle3d(repr, color));
-  mol3dViewer.render();
-}
+  const c = color; // values already match 3Dmol colorscheme names
 
-function _buildStyle3d(repr, color) {
-  const c = color === 'chainname' ? 'chain' : color === 'residueindex' ? 'residueIndex' : color;
-  if (repr === 'cartoon')    return { cartoon: { color: c } };
-  if (repr === 'ball+stick') return { stick: {}, sphere: { scale: 0.3 } };
-  if (repr === 'surface')    return { surface: { opacity: 0.7, color: c } };
-  if (repr === 'licorice')   return { stick: { color: c } };
-  if (repr === 'spacefill')  return { sphere: { color: c } };
-  return { cartoon: { color: c } };
+  // Clear all styles first
+  mol3dViewer.setStyle({}, {});
+
+  // Protein (ATOM records — standard residues): user-selected repr
+  const protStyle = {};
+  if (repr === 'cartoon')    protStyle.cartoon   = { color: c };
+  else if (repr === 'surface') protStyle.surface  = { opacity: 0.75, color: c };
+  else if (repr === 'spacefill') protStyle.sphere = { color: c };
+  else                       protStyle.stick      = { color: c };
+  mol3dViewer.setStyle({ hetflag: false }, protStyle);
+
+  // Ligand (HETATM records — small molecules): always ball+stick, bright color
+  mol3dViewer.setStyle({ hetflag: true }, {
+    stick:  { radius: 0.18, colorscheme: 'Jmol' },
+    sphere: { scale: 0.28,  colorscheme: 'Jmol' },
+  });
+
+  mol3dViewer.render();
 }
 
 function _stopAnim() {
