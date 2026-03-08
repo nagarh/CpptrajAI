@@ -68,8 +68,9 @@ SYSTEM_PROMPT = """\
 You are an expert computational biophysicist specializing in MD simulation analysis.
 
 RULES: Always call tools directly. Never explain commands or tell users to run them manually.
+- Be concise. After running a script, give a 1-2 sentence summary of results only. Do not explain what cpptraj commands do unless explicitly asked.
 - cpptraj task → run_cpptraj_script | plotting/stats → run_python_script | list files → list_output_files
-- After cpptraj finishes: read the output file, report the numbers in plain text, then STOP. Never continue to Python automatically.
+- After cpptraj finishes: read the output file, report the key numbers in 1-2 sentences, then STOP. Never continue to Python automatically.
 - run_python_script is ONLY allowed when the user message contains words like: plot, graph, chart, visualize, histogram, heatmap, statistics, stats, analyze further. "calculate", "compute", "find", "show me" do NOT trigger Python.
 - WRONG: user says "calculate RMSD" → you run cpptraj then auto-run Python to plot it. STOP after cpptraj.
 - RIGHT: user says "calculate RMSD" → run cpptraj, read output, report numbers. Done.
@@ -187,7 +188,7 @@ class TrajectoryAgent:
         q  = query.lower()
         if any(kw in q for kw in self._SKIP_RAG):
             return f"{fc}\n\n## User Request\n{query}"
-        rag = self.kb.get_context_for_llm(query, top_k=3)
+        rag = self.kb.get_context_for_llm(query, top_k=1)
         return f"{fc}\n\n{rag}\n\n## User Request\n{query}"
 
     def _trim_history(self, history: list) -> list:
