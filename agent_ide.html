@@ -940,11 +940,11 @@
             <option value="ball+stick">Ball+Stick</option>
           </select>
           <select class="viewer-select" id="colorSelect" onchange="changeRepr()">
-            <option value="spectrum" selected>Spectrum</option>
+            <option value="spectrum"    selected>Spectrum</option>
             <option value="chain">Chain</option>
-            <option value="residueIndex">Residue#</option>
-            <option value="whiteCarbon">Element</option>
             <option value="ssJmol">Secondary Str</option>
+            <option value="whiteCarbon">Element (dark)</option>
+            <option value="Jmol">Element (Jmol)</option>
           </select>
           <button class="btn btn-ghost" style="font-size:11px;padding:4px 8px" onclick="viewerCenter()" title="Reset view">⊙</button>
           <button class="btn btn-ghost" style="font-size:11px;padding:4px 8px" onclick="viewerSpin()" id="spinBtn" title="Toggle spin">↻</button>
@@ -2223,28 +2223,37 @@ async function loadIntoViewer() {
   }
 }
 
+// Standard protein + capping residue names — everything else is ligand
+const _PROT_RESNS = ['ALA','ARG','ASN','ASP','CYS','CYX','GLN','GLU','GLY',
+  'HIS','HIE','HID','HIP','ILE','LEU','LYS','MET','PHE','PRO','SER','THR',
+  'TRP','TYR','VAL','ACE','NME','NHE','NH2'];
+
+function _colorSpec(color) {
+  // 'spectrum' is a special color value; everything else is a colorscheme name
+  return color === 'spectrum' ? { color: 'spectrum' } : { colorscheme: color };
+}
+
 function _applyRepr3d() {
   if (!mol3dViewer) return;
   const repr  = document.getElementById('reprSelect').value;
   const color = document.getElementById('colorSelect').value;
-  const c = color; // values already match 3Dmol colorscheme names
+  const cs    = _colorSpec(color);
 
-  // Clear all styles first
-  mol3dViewer.setStyle({}, {});
-
-  // Protein (ATOM records — standard residues): user-selected repr
-  const protStyle = {};
-  if (repr === 'cartoon')    protStyle.cartoon   = { color: c };
-  else if (repr === 'surface') protStyle.surface  = { opacity: 0.75, color: c };
-  else if (repr === 'spacefill') protStyle.sphere = { color: c };
-  else                       protStyle.stick      = { color: c };
-  mol3dViewer.setStyle({ hetflag: false }, protStyle);
-
-  // Ligand (HETATM records — small molecules): always ball+stick, bright color
-  mol3dViewer.setStyle({ hetflag: true }, {
-    stick:  { radius: 0.18, colorscheme: 'Jmol' },
-    sphere: { scale: 0.28,  colorscheme: 'Jmol' },
+  // Step 1: all atoms → ligand style (ball+stick, Jmol element colors)
+  // whiteCarbon is great for dark bg: C=white, N=blue, O=red, S=yellow
+  mol3dViewer.setStyle({}, {
+    stick:  { radius: 0.14, colorscheme: 'whiteCarbon' },
+    sphere: { scale: 0.27,  colorscheme: 'whiteCarbon' },
   });
+
+  // Step 2: override protein residues with user-selected repr
+  let protStyle;
+  if (repr === 'cartoon')    protStyle = { cartoon:  { ...cs } };
+  else if (repr === 'surface')   protStyle = { surface:  { ...cs, opacity: 0.82 } };
+  else if (repr === 'spacefill') protStyle = { sphere:   { ...cs } };
+  else                           protStyle = { stick: { ...cs, radius: 0.14 },
+                                               sphere: { ...cs, scale: 0.27 } };
+  mol3dViewer.setStyle({ resn: _PROT_RESNS }, protStyle);
 
   mol3dViewer.render();
 }
