@@ -361,7 +361,7 @@
   .right-tab-content { flex:1; min-height:0; overflow:hidden; }
 
   /* VIEWER PANEL */
-  .viewer-panel { display:flex; flex-direction:column; overflow:hidden; background:#0d1117; }
+  .viewer-panel { display:flex; flex-direction:column; overflow:hidden; background:#0d1117; flex:1; min-height:0; }
   #ngl-stage { flex:1; min-height:0; min-width:0; position:relative; cursor:grab; overflow:hidden; }
   #ngl-stage:active { cursor:grabbing; }
   #ngl-stage canvas { position:absolute !important; top:0; left:0; width:100% !important; height:100% !important; }
@@ -677,6 +677,15 @@
   .modal input:focus { border-color: var(--accent); }
   .modal-btns { display: flex; gap: 8px; justify-content: flex-end; margin-top: 4px; }
   .modal-note { font-size: 11px; color: var(--text-muted); line-height: 1.5; margin-bottom: 14px; }
+  .tpl-item {
+    padding: 10px 12px; border-radius: 6px; border: 1px solid var(--border);
+    cursor: pointer; margin-bottom: 6px; background: var(--bg);
+    transition: border-color .15s, background .15s;
+  }
+  .tpl-item:hover { border-color: var(--accent); background: var(--surface2); }
+  .tpl-item.selected { border-color: var(--accent); background: rgba(88,166,255,.08); }
+  .tpl-item-name { font-size: 13px; color: var(--text); font-weight: 600; }
+  .tpl-item-desc { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
 </style>
 </head>
 <body>
@@ -706,6 +715,18 @@
     <div class="modal-btns">
       <button class="btn btn-ghost" onclick="closeSettings()">Cancel</button>
       <button class="btn btn-primary" onclick="saveSettings()">Apply</button>
+    </div>
+  </div>
+</div>
+
+<!-- TEMPLATES MODAL -->
+<div class="modal-overlay" id="templatesModal">
+  <div class="modal" style="width:480px;max-width:94vw">
+    <h2>⬡ Script Templates</h2>
+    <div id="tplList" style="max-height:380px;overflow-y:auto;padding-right:4px"></div>
+    <div class="modal-btns" style="margin-top:12px">
+      <button class="btn btn-ghost" onclick="document.getElementById('templatesModal').classList.remove('open')">Cancel</button>
+      <button class="btn btn-primary" id="tplLoadBtn" onclick="applyTemplate()">Load Template</button>
     </div>
   </div>
 </div>
@@ -754,53 +775,105 @@
 
   <div class="divider" id="divL"></div>
 
-  <!-- CENTER: Editor + Terminal -->
+  <!-- CENTER: Editor + Viewer (tabbed) -->
   <div class="panel-center">
     <div class="editor-toolbar">
       <div class="file-tabs">
-        <div class="file-tab active">
+        <div class="file-tab active" id="ctab-editor" onclick="setCenterTab('editor',this)" style="cursor:pointer">
           <span class="file-tab-dot"></span>
           analysis.cpptraj
         </div>
+        <div class="file-tab" id="ctab-viewer" onclick="setCenterTab('viewer',this)" style="cursor:pointer">
+          ⬡ Viewer
+        </div>
       </div>
-      <button class="btn btn-ghost" style="font-size:11px" onclick="downloadScript()">⬇ Save</button>
+      <button class="btn btn-ghost" style="font-size:11px" id="saveScriptBtn" onclick="downloadScript()">⬇ Save</button>
     </div>
-    <div class="editor-area">
-      <div class="editor-wrapper">
-        <div class="line-numbers" id="lineNumbers"></div>
-        <textarea id="editor" spellcheck="false"
-          oninput="updateLineNumbers()" onscroll="syncScroll()"
-          placeholder="# cpptraj script
+
+    <!-- Editor pane -->
+    <div id="center-editor" style="display:flex;flex-direction:column;flex:1;min-height:0">
+      <div class="editor-area">
+        <div class="editor-wrapper">
+          <div class="line-numbers" id="lineNumbers"></div>
+          <textarea id="editor" spellcheck="false"
+            oninput="updateLineNumbers()" onscroll="syncScroll()"
+            placeholder="# cpptraj script
 # Use the command reference on the left to build your analysis
 # Click any command to see its syntax, then click 'Insert' to add it here
 "></textarea>
+        </div>
+      </div>
+      <div class="editor-status">
+        <div class="status-item"><span class="status-dot"></span> Ready</div>
+        <div class="status-item" id="cursorPos">Ln 1, Col 1</div>
+        <div class="status-item" id="lineCount">0 lines</div>
+        <div class="status-item" style="color:var(--accent);font-family:JetBrains Mono,monospace;font-size:10px">CPPTRAJ SCRIPT</div>
+      </div>
+      <div class="run-bar">
+        <button class="btn btn-success" style="font-size:12px" onclick="runAnalysis()">▶ Run</button>
+        <div class="progress-bar" id="progressBar"><div class="progress-fill" id="progressFill"></div></div>
+        <div class="spinner" id="spinner"></div>
+        <span id="runStatus" style="font-size:12px;color:var(--text-muted);font-family:JetBrains Mono,monospace"></span>
+        <button class="btn btn-ghost" style="font-size:11px;margin-left:auto" onclick="clearTerminal()">Clear Output</button>
+      </div>
+      <div class="h-divider" id="divH"></div>
+      <div class="terminal">
+        <div class="terminal-header">
+          Output Terminal
+          <span id="termStatus" style="color:var(--accent2)">●  IDLE</span>
+        </div>
+        <div class="terminal-body" id="termBody">
+          <span class="t-line t-info">CpptrajGPT — Molecular Dynamics Analysis Studio</span>
+          <span class="t-line t-info">Upload topology + trajectory files, write your script, click ▶ Run.</span>
+          <span class="t-line t-info">Use ⚙ in the header to set your Anthropic API key for the AI Agent.</span>
+          <span class="t-line t-info">─────────────────────────────────────────────────────────</span>
+          <span class="t-line t-prompt">$  </span>
+        </div>
       </div>
     </div>
-    <div class="editor-status">
-      <div class="status-item"><span class="status-dot"></span> Ready</div>
-      <div class="status-item" id="cursorPos">Ln 1, Col 1</div>
-      <div class="status-item" id="lineCount">0 lines</div>
-      <div class="status-item" style="color:var(--accent);font-family:JetBrains Mono,monospace;font-size:10px">CPPTRAJ SCRIPT</div>
-    </div>
-    <div class="run-bar">
-      <button class="btn btn-success" style="font-size:12px" onclick="runAnalysis()">▶ Run</button>
-      <div class="progress-bar" id="progressBar"><div class="progress-fill" id="progressFill"></div></div>
-      <div class="spinner" id="spinner"></div>
-      <span id="runStatus" style="font-size:12px;color:var(--text-muted);font-family:JetBrains Mono,monospace"></span>
-      <button class="btn btn-ghost" style="font-size:11px;margin-left:auto" onclick="clearTerminal()">Clear Output</button>
-    </div>
-    <div class="h-divider" id="divH"></div>
-    <div class="terminal">
-      <div class="terminal-header">
-        Output Terminal
-        <span id="termStatus" style="color:var(--accent2)">●  IDLE</span>
+
+    <!-- Viewer pane (hidden by default) -->
+    <div id="center-viewer" class="viewer-panel" style="display:none;flex:1;min-height:0">
+      <div id="ngl-stage">
+        <div class="viewer-empty" id="viewerEmpty">
+          <div style="font-size:32px">⬡</div>
+          <div>Click <strong>Load into Viewer</strong> to visualise your trajectory</div>
+        </div>
       </div>
-      <div class="terminal-body" id="termBody">
-        <span class="t-line t-info">CpptrajGPT — Molecular Dynamics Analysis Studio</span>
-        <span class="t-line t-info">Upload topology + trajectory files, write your script, click ▶ Run.</span>
-        <span class="t-line t-info">Use ⚙ in the header to set your Anthropic API key for the AI Agent.</span>
-        <span class="t-line t-info">─────────────────────────────────────────────────────────</span>
-        <span class="t-line t-prompt">$  </span>
+      <div class="viewer-controls">
+        <div class="viewer-row">
+          <button class="btn btn-primary" style="font-size:11px;padding:4px 12px" onclick="loadIntoViewer()" id="loadViewerBtn">⬡ Load into Viewer</button>
+          <label style="font-size:11px;color:var(--text-muted)">Frame</label>
+          <input type="number" id="viewerFirstFrame" min="1" value="1" placeholder="First" title="First frame" style="width:58px;font-size:11px;background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:4px;padding:2px 5px">
+          <label style="font-size:11px;color:var(--text-muted)">to</label>
+          <input type="number" id="viewerLastFrame" min="1" value="" placeholder="Last" title="Last frame (blank = all)" style="width:58px;font-size:11px;background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:4px;padding:2px 5px">
+          <select class="viewer-select" id="reprSelect" onchange="changeRepr()">
+            <option value="cartoon" selected>Cartoon</option>
+            <option value="surface">Surface</option>
+            <option value="spacefill">Spacefill</option>
+            <option value="ball+stick">Ball+Stick</option>
+          </select>
+          <select class="viewer-select" id="colorSelect" onchange="changeRepr()">
+            <option value="spectrum"    selected>Spectrum</option>
+            <option value="chain">Chain</option>
+            <option value="ssJmol">Secondary Str</option>
+            <option value="whiteCarbon">Element (dark)</option>
+            <option value="Jmol">Element (Jmol)</option>
+          </select>
+          <button class="btn btn-ghost" style="font-size:11px;padding:4px 8px" onclick="viewerCenter()" title="Reset view">⊙</button>
+          <button class="btn btn-ghost" style="font-size:11px;padding:4px 8px" onclick="viewerSpin()" id="spinBtn" title="Toggle spin">↻</button>
+        </div>
+        <div class="viewer-row">
+          <button class="btn btn-ghost" style="font-size:11px;padding:3px 10px;min-width:72px" onclick="viewerTogglePlay()" id="playBtn">▶ Play</button>
+          <input type="range" class="viewer-slider" id="frameSlider" min="0" value="0" oninput="viewerSetFrame(+this.value)">
+          <span class="viewer-frame" id="frameCounter">— / —</span>
+        </div>
+        <div class="viewer-row">
+          <span class="viewer-label">Speed</span>
+          <input type="range" class="viewer-slider" id="speedSlider" min="20" max="500" value="100" style="max-width:100px" oninput="viewerSetSpeed(+this.value)">
+          <span class="viewer-label" id="speedLabel">100 ms/frame</span>
+          <button class="btn btn-ghost" style="font-size:10px;padding:2px 8px;margin-left:auto" onclick="viewerScreenshot()">📷</button>
+        </div>
       </div>
     </div>
   </div>
@@ -816,7 +889,6 @@
       <button class="rtab"        onclick="setRightTab('detail', this)" id="rtab-detail">Detail</button>
       <button class="rtab"        onclick="setRightTab('ai',     this)" id="rtab-ai">⚡ AI Agent</button>
       <button class="rtab"        onclick="setRightTab('output', this)" id="rtab-output">Output</button>
-      <button class="rtab"        onclick="setRightTab('viewer', this)" id="rtab-viewer">⬡ Viewer</button>
     </div>
 
     <!-- FILES tab -->
@@ -881,13 +953,13 @@
       <div class="chat-messages" id="chatMessages">
         <div class="no-select" style="padding:30px 10px">
           <div class="big">⚡</div>
-          <div style="font-size:12px">Describe your analysis in plain<br>English. The agent writes and<br>runs the cpptraj script for you.</div>
+          <div style="font-size:12px">Analyse your trajectory using AI.</div>
         </div>
       </div>
       <div class="chat-input-bar">
         <div class="chat-input-wrap">
           <textarea id="chatInput" rows="2"
-            placeholder="e.g. Calculate backbone RMSD vs first frame…"
+            placeholder="Analyse your trajectory using AI…"
             onkeydown="chatKeydown(event)"></textarea>
         </div>
         <button class="chat-send-btn" id="chatSendBtn" onclick="sendChat()">Send</button>
@@ -918,50 +990,6 @@
           <button class="btn btn-ghost" style="font-size:10px;padding:2px 8px" id="outfileDlBtn">⬇ Download</button>
         </div>
         <div class="outfile-content" id="outfileViewerContent"></div>
-      </div>
-    </div>
-
-    <!-- VIEWER tab -->
-    <div id="tab-viewer" class="right-tab-content viewer-panel" style="display:none">
-      <div id="ngl-stage">
-        <div class="viewer-empty" id="viewerEmpty">
-          <div style="font-size:32px">⬡</div>
-          <div>Load topology + trajectory,<br>then click <strong style="color:var(--accent)">Load into Viewer</strong></div>
-        </div>
-      </div>
-      <div class="viewer-controls">
-        <!-- Row 1: load + representation -->
-        <div class="viewer-row">
-          <button class="btn btn-primary" style="font-size:11px;padding:4px 12px" onclick="loadIntoViewer()" id="loadViewerBtn">⬡ Load into Viewer</button>
-          <select class="viewer-select" id="reprSelect" onchange="changeRepr()">
-            <option value="cartoon" selected>Cartoon</option>
-            <option value="surface">Surface</option>
-            <option value="spacefill">Spacefill</option>
-            <option value="ball+stick">Ball+Stick</option>
-          </select>
-          <select class="viewer-select" id="colorSelect" onchange="changeRepr()">
-            <option value="spectrum"    selected>Spectrum</option>
-            <option value="chain">Chain</option>
-            <option value="ssJmol">Secondary Str</option>
-            <option value="whiteCarbon">Element (dark)</option>
-            <option value="Jmol">Element (Jmol)</option>
-          </select>
-          <button class="btn btn-ghost" style="font-size:11px;padding:4px 8px" onclick="viewerCenter()" title="Reset view">⊙</button>
-          <button class="btn btn-ghost" style="font-size:11px;padding:4px 8px" onclick="viewerSpin()" id="spinBtn" title="Toggle spin">↻</button>
-        </div>
-        <!-- Row 2: frame scrubber -->
-        <div class="viewer-row">
-          <button class="btn btn-ghost" style="font-size:11px;padding:3px 10px;min-width:72px" onclick="viewerTogglePlay()" id="playBtn">▶ Play</button>
-          <input type="range" class="viewer-slider" id="frameSlider" min="0" value="0" oninput="viewerSetFrame(+this.value)">
-          <span class="viewer-frame" id="frameCounter">— / —</span>
-        </div>
-        <!-- Row 3: speed -->
-        <div class="viewer-row">
-          <span class="viewer-label">Speed</span>
-          <input type="range" class="viewer-slider" id="speedSlider" min="20" max="500" value="100" style="max-width:100px" oninput="viewerSetSpeed(+this.value)">
-          <span class="viewer-label" id="speedLabel">100 ms/frame</span>
-          <button class="btn btn-ghost" style="font-size:10px;padding:2px 8px;margin-left:auto" onclick="viewerScreenshot()">📷</button>
-        </div>
       </div>
     </div>
 
@@ -1447,13 +1475,21 @@ function setRightTab(mode, el) {
   rightMode = mode;
   document.querySelectorAll('.rtab').forEach(b => b.classList.remove('active'));
   el.classList.add('active');
-  const ids = ['files','detail','ai','output','viewer'];
-  ids.forEach(id => {
+  ['files','detail','ai','output'].forEach(id => {
     const t = document.getElementById(`tab-${id}`);
     if (t) t.style.display = id === mode ? 'flex' : 'none';
   });
   if (mode === 'output') refreshOutputFiles();
-  if (mode === 'viewer') setTimeout(initNGL, 50);
+}
+
+function setCenterTab(tab, el) {
+  document.querySelectorAll('.file-tab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  const isViewer = tab === 'viewer';
+  document.getElementById('center-editor').style.display = isViewer ? 'none' : 'flex';
+  document.getElementById('center-viewer').style.display = isViewer ? 'flex' : 'none';
+  document.getElementById('saveScriptBtn').style.display = isViewer ? 'none' : '';
+  if (isViewer && mol3dViewer) setTimeout(() => mol3dViewer.resize(), 50);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1478,6 +1514,7 @@ async function refreshOutputFiles() {
         <span style="font-size:14px">${icon}</span>
         <span class="outfile-name">${f.name}</span>
         <span class="outfile-size">${sz}</span>
+        <a href="/api/file/${encodeURIComponent(f.name)}" download="${f.name}" onclick="event.stopPropagation()" title="Download" style="color:var(--text-muted);font-size:12px;text-decoration:none;padding:2px 4px;border-radius:3px;flex-shrink:0" onmouseover="this.style.color='var(--accent)'" onmouseout="this.style.color='var(--text-muted)'">⬇</a>
       </div>`;
     }).join('');
   } catch(e) { /* server not running yet */ }
@@ -1511,12 +1548,14 @@ async function viewOutputFile(name) {
   } else {
     try {
       const r    = await fetch(`/api/file/${encodeURIComponent(name)}`);
-      const text = await r.text();
+      const blob = await r.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      // Show text preview
+      const text = await blob.text();
       content.textContent = text.slice(0, 4000) + (text.length > 4000 ? '\n… (truncated)' : '');
       dlBtn.onclick = () => {
-        const blob = new Blob([text], {type:'text/plain'});
         const a = document.createElement('a');
-        a.href = URL.createObjectURL(blob);
+        a.href = blobUrl;
         a.download = name;
         a.click();
       };
@@ -2004,45 +2043,42 @@ async function refreshStatus() {
 // ─────────────────────────────────────────────────────────────────────────────
 // TEMPLATES
 // ─────────────────────────────────────────────────────────────────────────────
-function loadTemplate() {
-  const templates = [
-    { name:'Basic RMSD + RMSF', script:`# Basic Protein Analysis
+const _TEMPLATES = [
+  { name:'Basic RMSD + RMSF', desc:'Backbone RMSD, per-residue RMSF, radius of gyration', script:`# Basic Protein Analysis
 parm topology.prmtop
 trajin trajectory.nc
-
+strip :WAT
 autoimage
-center !:WAT origin
 
 rmsd backbone @CA,C,N,O first out rmsd.dat
 atomicfluct rmsf @CA byres out rmsf.dat
 radgyr rg !:WAT mass out rg.dat
 
 go` },
-    { name:'H-bond Analysis', script:`# Hydrogen Bond Analysis
+  { name:'H-bond Analysis', desc:'Protein H-bonds, distance ≤3.5Å, angle ≥135°', script:`# Hydrogen Bond Analysis
 parm system.prmtop
 trajin traj.nc
-
+strip :WAT
 autoimage
 
 hbond hbonds !:WAT out hbond.dat avgout hbond_avg.dat dist 3.5 angle 135
 
 go` },
-    { name:'Trajectory Clustering', script:`# Trajectory Clustering
+  { name:'Trajectory Clustering', desc:'Hierarchical clustering on Cα atoms', script:`# Trajectory Clustering
 parm protein.prmtop
 trajin trajectory.nc
-
-autoimage
 strip :WAT,Na+,Cl-
+autoimage
 
 cluster clusters @CA hieragglo epsilon 2.0 sieve 10 \\
   out cluster_assign.dat summary cluster_sum.dat \\
   info cluster_info.dat repout cluster_rep repfmt pdb
 
 go` },
-    { name:'PCA', script:`# Principal Component Analysis
+  { name:'PCA', desc:'Principal component analysis on Cα', script:`# Principal Component Analysis
 parm protein.prmtop
 trajin trajectory.nc
-
+strip :WAT
 autoimage
 align @CA reference
 
@@ -2051,29 +2087,68 @@ analyze modes eigenvalues evectors pca_mat out pca_modes.dat
 projection pca_proj evecvecs pca_mat @CA out pca_proj.dat beg 1 end 3
 
 go` },
-    { name:'Strip Solvent & Save', script:`# Strip solvent and write clean trajectory
+  { name:'Strip Solvent & Save', desc:'Remove water/ions and write clean trajectory', script:`# Strip solvent and write clean trajectory
 parm system.prmtop
 trajin traj.nc
-
-autoimage
 strip :WAT,Na+,Cl-
+autoimage
 
 trajout protein_only.nc
 
 go` },
-  ];
+  { name:'Secondary Structure', desc:'DSSP per-residue secondary structure over time', script:`# Secondary Structure Analysis
+parm protein.prmtop
+trajin trajectory.nc
+strip :WAT
+autoimage
 
-  const names = templates.map((t,i) => `${i+1}. ${t.name}`).join('\n');
-  const choice = prompt(`Choose a template:\n\n${names}\n\nEnter number (1-${templates.length}):`);
-  const idx = parseInt(choice) - 1;
-  if (idx >= 0 && idx < templates.length) {
-    if (!document.getElementById('editor').value.trim() ||
-        confirm(`Replace current script with "${templates[idx].name}"?`)) {
-      document.getElementById('editor').value = templates[idx].script;
-      updateLineNumbers();
-    }
-  }
+secstruct ss out secstruct.dat
+
+go` },
+  { name:'SASA', desc:'Solvent accessible surface area over time', script:`# SASA Analysis
+parm protein.prmtop
+trajin trajectory.nc
+strip :WAT
+autoimage
+
+surf sasa !:WAT out sasa.dat
+
+go` },
+];
+
+let _tplSelected = 0;
+
+function loadTemplate() {
+  const list = document.getElementById('tplList');
+  list.innerHTML = _TEMPLATES.map((t, i) => `
+    <div class="tpl-item${i===0?' selected':''}" id="tpl-item-${i}" onclick="selectTemplate(${i})">
+      <div class="tpl-item-name">${t.name}</div>
+      <div class="tpl-item-desc">${t.desc}</div>
+    </div>`).join('');
+  _tplSelected = 0;
+  document.getElementById('templatesModal').classList.add('open');
 }
+
+function selectTemplate(i) {
+  document.querySelectorAll('.tpl-item').forEach(el => el.classList.remove('selected'));
+  document.getElementById(`tpl-item-${i}`).classList.add('selected');
+  _tplSelected = i;
+}
+
+function applyTemplate() {
+  const t = _TEMPLATES[_tplSelected];
+  const editor = document.getElementById('editor');
+  if (!editor.value.trim() || confirm(`Replace current script with "${t.name}"?`)) {
+    editor.value = t.script;
+    updateLineNumbers();
+  }
+  document.getElementById('templatesModal').classList.remove('open');
+}
+
+document.getElementById('templatesModal').addEventListener('click', e => {
+  if (e.target === document.getElementById('templatesModal'))
+    document.getElementById('templatesModal').classList.remove('open');
+});
 
 // ─────────────────────────────────────────────────────────────────────────────
 // TEST DATA HELPERS
@@ -2137,7 +2212,7 @@ document.getElementById('tab-files').style.flexDirection = 'column';
 document.getElementById('tab-detail').style.display = 'none';
 document.getElementById('tab-ai').style.display     = 'none';
 document.getElementById('tab-output').style.display = 'none';
-document.getElementById('tab-viewer').style.display = 'none';
+
 
 // ─────────────────────────────────────────────────────────────────────────────
 // TRAJECTORY VIEWER  (NGL WebGL)
@@ -2171,6 +2246,8 @@ async function loadIntoViewer() {
     return;
   }
 
+  // Switch to viewer tab
+  setCenterTab('viewer', document.getElementById('ctab-viewer'));
   const btn = document.getElementById('loadViewerBtn');
   btn.disabled = true;
   btn.textContent = '⟳ Converting…';
@@ -2188,7 +2265,11 @@ async function loadIntoViewer() {
       pdbText = await (await fetch(`/api/file/${encodeURIComponent(pdbTraj.name)}`)).text();
     } else {
       termLog('[viewer] Converting via cpptraj (stripping solvent)…', 't-info');
-      const r = await fetch('/api/prepare_viewer', { method: 'POST' });
+      const firstFrame = parseInt(document.getElementById('viewerFirstFrame').value) || 1;
+      const lastFrame  = parseInt(document.getElementById('viewerLastFrame').value)  || null;
+      const r = await fetch('/api/prepare_viewer', { method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ first_frame: firstFrame, last_frame: lastFrame }) });
       const d = await r.json();
       if (!r.ok || !d.ok) { termLog(`[viewer] Conversion failed: ${d.error}`, 't-error'); return; }
       termLog(`[viewer] Done — ${d.frames} frames, loading…`, 't-success');

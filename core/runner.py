@@ -18,6 +18,7 @@ class CPPTrajRunner:
         self.work_dir = Path(work_dir) if work_dir else Path(tempfile.mkdtemp(prefix="cpptraj_"))
         self.work_dir.mkdir(parents=True, exist_ok=True)
         self.output_files: list[Path] = []
+        self._uploaded_names: set[str] = set()
 
     # ── File management ────────────────────────────────────────────────────
 
@@ -26,16 +27,20 @@ class CPPTrajRunner:
         fname = name or uploaded_file.filename
         dest = self.work_dir / fname
         uploaded_file.save(dest)
+        self._uploaded_names.add(fname)
         return dest
 
     def list_output_files(self) -> list[Path]:
         """Return all files in the work directory (excluding topology/trajectory inputs)."""
-        skip = {".prmtop", ".parm7", ".psf", ".nc", ".ncdf", ".dcd",
-                ".trr", ".xtc", ".crd", ".mdcrd", ".rst7", ".pdb"}
+        skip_exts = {".prmtop", ".parm7", ".psf", ".nc", ".ncdf", ".dcd",
+                     ".trr", ".xtc", ".crd", ".mdcrd", ".rst7"}
         return sorted(
             p for p in self.work_dir.iterdir()
-            if p.is_file() and p.suffix.lower() not in skip
+            if p.is_file()
+            and p.suffix.lower() not in skip_exts
+            and p.name not in self._uploaded_names
         )
+
 
     def read_file(self, path: Path) -> str:
         """Read a text file, returning its contents."""

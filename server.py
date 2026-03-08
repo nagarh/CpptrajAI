@@ -273,9 +273,14 @@ def prepare_viewer():
     if not parm_file or not traj_files:
         return jsonify({"error": "Upload topology and trajectory first."}), 400
 
+    data = request.get_json(silent=True) or {}
+    first_frame = int(data.get("first_frame") or 1)
+    last_frame  = data.get("last_frame")
+    frame_range = f" {first_frame} {int(last_frame)}" if last_frame else (f" {first_frame}" if first_frame > 1 else "")
+
     out_pdb = WORK_DIR / "viewer_traj.pdb"
     script = f"""parm {parm_file}
-trajin {traj_files[0]}
+trajin {traj_files[0]}{frame_range}
 strip :WAT,HOH,TIP3,Na+,Cl-,NA,CL
 autoimage
 trajout {out_pdb} pdb
@@ -284,7 +289,7 @@ go"""
 
     if not out_pdb.exists() or out_pdb.stat().st_size == 0:
         script2 = f"""parm {parm_file}
-trajin {traj_files[0]}
+trajin {traj_files[0]}{frame_range}
 autoimage
 trajout {out_pdb} pdb
 go"""
