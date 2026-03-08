@@ -6,6 +6,7 @@ Matches the aesthetic of agent_ide.html:
   - Three-panel layout: Command Ref | Editor + Terminal/AI | Files + Detail
 """
 
+import base64 as _b64
 import os
 import tempfile
 from pathlib import Path
@@ -36,9 +37,7 @@ st.set_page_config(
 # GLOBAL CSS — match agent_ide.html exactly
 # ─────────────────────────────────────────────────────────────────────────────
 
-st.markdown("""
-<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
-<style>
+_CSS = """
 /* ── Variables ──────────────────────────────────────── */
 :root {
   --bg:        #0d1117;
@@ -672,8 +671,14 @@ code { font-family: 'JetBrains Mono', monospace !important; color: var(--text) !
 /* ── Remove streamlit container gaps ────────────────── */
 .element-container { margin: 0 !important; }
 div[data-testid="stVerticalBlock"] > div { gap: 0 !important; }
-</style>
-""", unsafe_allow_html=True)
+"""
+_b64css = _b64.b64encode(_CSS.encode()).decode()
+st.markdown(
+    '<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700'
+    '&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">'
+    f'<link rel="stylesheet" href="data:text/css;base64,{_b64css}">',
+    unsafe_allow_html=True,
+)
 
 # ─────────────────────────────────────────────────────────────────────────────
 # SESSION STATE
@@ -914,7 +919,7 @@ with left:
             </div>
             """, unsafe_allow_html=True)
             if st.button(f"Select {cmd_key}", key=f"sel_{cmd_key}",
-                         use_container_width=True, label_visibility="collapsed"):
+                         use_container_width=True):
                 st.session_state.sel_cmd = cmd_key
                 st.rerun()
 
