@@ -127,6 +127,34 @@ def upload():
     })
 
 
+@app.route("/api/run_python", methods=["POST"])
+def run_python():
+    import subprocess, sys, time
+    data   = request.get_json(silent=True) or {}
+    script = data.get("script", "").strip()
+    if not script:
+        return jsonify({"error": "Empty script"}), 400
+    t0 = time.time()
+    try:
+        proc = subprocess.run(
+            [sys.executable, "-c", script],
+            capture_output=True, text=True, timeout=120,
+            cwd=str(WORK_DIR),
+        )
+        elapsed = round(time.time() - t0, 2)
+        return jsonify({
+            "success": proc.returncode == 0,
+            "stdout":  proc.stdout[:8000],
+            "stderr":  proc.stderr[:3000],
+            "elapsed": elapsed,
+            "output_files": [f.name for f in runner.list_output_files()],
+        })
+    except subprocess.TimeoutExpired:
+        return jsonify({"success": False, "stdout": "", "stderr": "Timed out after 120s.", "elapsed": 120})
+    except Exception as e:
+        return jsonify({"success": False, "stdout": "", "stderr": str(e), "elapsed": 0})
+
+
 @app.route("/api/run", methods=["POST"])
 def run_script():
     data = request.get_json(silent=True) or {}
@@ -220,6 +248,30 @@ def chat_reset():
     global _agent
     if _agent:
         _agent.reset_conversation()
+    return jsonify({"ok": True})
+
+
+@app.route("/api/reset_all", methods=["POST"])
+def reset_all():
+    """Reset everything: chat history, uploaded files, output files."""
+    global _agent, parm_file, traj_files
+    import shutil
+
+    # Reset agent/chat history
+    if _agent:
+        _agent.reset_conversation()
+
+    # Clear uploaded file references
+    parm_file = None
+    traj_files = []
+
+    # Delete all files in work dir and recreate it
+    if runner.work_dir.exists():
+        shutil.rmtree(runner.work_dir)
+    runner.work_dir.mkdir(parents=True, exist_ok=True)
+    runner.output_files = []
+    runner._uploaded_names = set()
+
     return jsonify({"ok": True})
 
 

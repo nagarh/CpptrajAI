@@ -80,8 +80,12 @@ cpptraj syntax (spaces, NOT colons): `parm file.prmtop` not `parm: file.prmtop`.
 - ALWAYS strip :WAT before autoimage and before any RMSD/distance/secstruct analysis. Order: strip → autoimage → analysis. Without stripping water first, autoimage anchors to water molecules causing artificially huge RMSD (20-40 Å).
 - Output: `out rmsd.dat`. References: `first`, `refindex -1`. Masks: `@CA,C,N,O` `@CA` `:1-100` `!:WAT`
 
+## Python Environment
+Available packages: pandas, numpy, matplotlib, scikit-learn, scipy. NOT available: MDAnalysis, parmed, pytraj, openmm.
+NEVER use `delim_whitespace=True` (deprecated in pandas 2.x) — always use `sep=r'\s+'`.
+
 Python: `plt.savefig('f.png', dpi=150, bbox_inches='tight')` then `plt.close()`. Never plt.show().
-Read .dat files with pandas: `pd.read_csv('f.dat', sep='\\s+', comment='#')`. Print key stats to stdout.
+Read .dat files with pandas: `pd.read_csv('f.dat', sep=r'\\s+', comment='#')`. Print key stats to stdout.
 
 ## Residue Classification (critical — never misclassify)
 Protein residues (NOT ligands): ALA ARG ASN ASP CYS CYX GLN GLU GLY HIS HIE HID HIP ILE LEU LYS MET PHE PRO SER THR TRP TYR VAL
@@ -128,16 +132,21 @@ class TrajectoryAgent:
         self._backend = create_backend(provider, api_key, model, base_url)
         self.conversation_history = []
 
-    # Known protein/solvent/ion residue names — anything else is a ligand
-    _KNOWN_NON_LIGAND = {
+    _PROTEIN_RES = {
         "ALA","ARG","ASN","ASP","CYS","CYX","GLN","GLU","GLY",
         "HIS","HIE","HID","HIP","ILE","LEU","LYS","MET","PHE",
         "PRO","SER","THR","TRP","TYR","VAL",
         "ACE","NME","NHE","NH2",                        # caps
-        "WAT","HOH","TIP3","TIP4",                      # water
-        "NA","CL","K","MG","CA","ZN","NA+","CL-","K+",  # ions
-        "Na+","Cl-","Mg2+","Ca2+",
     }
+    _ION_RES = {
+        "NA","CL","K","MG","CA","ZN","NA+","CL-","K+",
+        "Na+","Cl-","Mg2+","Ca2+",
+        "SOD","CLA","POT","CAL",                        # CHARMM names
+        "LI","RB","CS","F","BR","I",
+    }
+    _WATER_RES = {"WAT","HOH","TIP3","TIP4","SPC","SPCE"}
+    # Combined set for ligand detection
+    _KNOWN_NON_LIGAND = _PROTEIN_RES | _ION_RES | _WATER_RES
 
     def set_files(self, parm_file: Path | None, traj_files: list[Path]):
         self.parm_file = parm_file
@@ -152,22 +161,26 @@ class TrajectoryAgent:
         script = f"parm {parm_file}\nresinfo *\ngo"
         res = self.runner.run_script(script)
         stdout = res.get("stdout", "")
-        ligands, n_protein, n_water = [], 0, 0
+        ligands, n_protein, n_water, n_ions = [], 0, 0, 0
         for line in stdout.splitlines():
             m = re.match(r'\s*(\d+)\s+(\S+)\s+\d+\s+\d+\s+(\d+)\s+', line)
             if not m:
                 continue
             resid, resname, natoms = int(m.group(1)), m.group(2), int(m.group(3))
-            if resname in ("WAT","HOH","TIP3","TIP4"):
+            rname_up = resname.upper()
+            if rname_up in {r.upper() for r in self._WATER_RES}:
                 n_water += 1
-            elif resname.upper() in self._KNOWN_NON_LIGAND:
+            elif rname_up in {r.upper() for r in self._ION_RES}:
+                n_ions += 1
+            elif rname_up in {r.upper() for r in self._PROTEIN_RES}:
                 n_protein += 1
             else:
                 ligands.append({"resid": resid, "name": resname, "natoms": natoms})
         self._topology_info = {
             "n_protein_res": n_protein,
-            "n_water": n_water,
-            "ligands": ligands,
+            "n_water":       n_water,
+            "n_ions":        n_ions,
+            "ligands":       ligands,
         }
 
     def reset_conversation(self):
@@ -183,20 +196,47 @@ class TrajectoryAgent:
     _SKIP_RAG = ("how many frames", "frame count", "list file", "list output",
                  "plot ", "show plot", "what files", "delete", "reset")
 
+    # Aliases: user terms → cpptraj command names
+    _CMD_ALIASES = {
+        "rg": "radgyr", "radius of gyration": "radgyr", "radgyr": "radgyr",
+        "rmsf": "atomicfluct", "bfactor": "atomicfluct", "b-factor": "atomicfluct",
+        "rmsd": "rmsd", "hbond": "hbond", "hydrogen bond": "hbond",
+        "secondary structure": "secstruct", "dssp": "secstruct",
+        "cluster": "cluster", "clustering": "cluster",
+        "contact map": "nativecontacts", "native contact": "nativecontacts",
+        "pca": "matrix", "principal component": "pca",
+        "dihedral": "dihedral", "phi psi": "dihedral",
+        "distance": "distance", "angle": "angle",
+        "sasa": "surf", "surface area": "surf",
+        "diffusion": "diffusion", "msd": "diffusion",
+    }
+
     def _build_user_message_with_rag(self, query: str) -> str:
         fc = self._build_file_context()
         q  = query.lower()
         if any(kw in q for kw in self._SKIP_RAG):
             return f"{fc}\n\n## User Request\n{query}"
-        rag = self.kb.get_context_for_llm(query, top_k=1)
-        return f"{fc}\n\n{rag}\n\n## User Request\n{query}"
+
+        # Inject exact syntax for any recognised command aliases
+        exact_lines = []
+        for alias, cmd_key in self._CMD_ALIASES.items():
+            if alias in q:
+                cmd = self.kb.get_command(cmd_key)
+                if cmd:
+                    exact_lines.append(f"  {cmd['title']}: {cmd['syntax']}")
+        exact_block = ""
+        if exact_lines:
+            exact_block = "## Relevant cpptraj syntax\n" + "\n".join(exact_lines) + "\n\n"
+
+        rag = self.kb.get_context_for_llm(query, top_k=3)
+        return f"{fc}\n\n{exact_block}{rag}\n\n## User Request\n{query}"
 
     def _trim_history(self, history: list) -> list:
         """Keep the last few turns, always cutting at a real user-text boundary.
 
-        Claude wraps tool results as role='user' with content=[{type:'tool_result'...}].
-        We must never start the window on such a message — doing so produces orphaned
-        tool_result blocks that the API rejects with a 400.
+        Must never start the window on a tool-result wrapper (Claude list content,
+        OpenAI _multi, or Gemini _fn_responses) — that produces orphaned results
+        the API rejects with a 400.
         """
         if len(history) <= 8:
             return history
@@ -206,8 +246,11 @@ class TrajectoryAgent:
         for i, msg in enumerate(history):
             if msg["role"] != "user":
                 continue
+            # Exclude Gemini function-response turns
+            if "_fn_responses" in msg:
+                continue
             content = msg.get("content", "")
-            if isinstance(content, str):
+            if isinstance(content, str) and content.strip():
                 real_user_idx.append(i)
             elif isinstance(content, list):
                 # A real user turn has at least one non-tool_result block
@@ -263,6 +306,8 @@ class TrajectoryAgent:
         if info:
             parts.append(f"\n## Topology Composition")
             parts.append(f"- Protein residues: {info['n_protein_res']}")
+            if info.get('n_ions'):
+                parts.append(f"- Ions: {info['n_ions']} residues")
             parts.append(f"- Water molecules: {info['n_water']}")
             ligs = info.get("ligands", [])
             if ligs:
@@ -281,7 +326,9 @@ class TrajectoryAgent:
 
     def _execute_tool(self, name: str, inp: dict) -> str:
         if name == "run_cpptraj_script":
-            script = inp["script"]
+            script = inp.get("script", "")
+            if not script:
+                return "Error: model did not provide a script."
             if self.parm_file or self.traj_files:
                 script = self.runner.inject_paths_into_script(script, self.parm_file, self.traj_files)
             res = self.runner.run_script(script)
@@ -311,7 +358,9 @@ class TrajectoryAgent:
                 f"  - {f.name} ({f.stat().st_size} bytes)" for f in files)
 
         if name == "run_python_script":
-            script   = inp["script"]
+            script = inp.get("script", "")
+            if not script:
+                return "Error: model did not provide a script."
             work_dir = self.runner.work_dir
             before   = set(work_dir.iterdir())
             try:
@@ -339,13 +388,15 @@ class TrajectoryAgent:
     def _sanitize_history(self):
         while self.conversation_history:
             last = self.conversation_history[-1]
-            if last["role"] != "assistant":
+            role = last["role"]
+            # Remove orphaned assistant/model messages with unresolved tool calls
+            if role not in ("assistant", "model"):
                 break
             content = last.get("content") or []
             has_unresolved = (
                 any(isinstance(b, dict) and b.get("type") == "tool_use" for b in content)
                 if isinstance(content, list)
-                else bool(last.get("tool_calls"))
+                else bool(last.get("tool_calls") or last.get("_fn_calls"))
             )
             if has_unresolved:
                 self.conversation_history.pop()
@@ -391,11 +442,15 @@ class TrajectoryAgent:
             for tc in tool_calls:
                 yield {"type": "tool_start", "tool": tc["name"],
                        "description": tc["input"].get("description", tc["name"])}
-                result = self._execute_tool(tc["name"], tc["input"])
+                try:
+                    result = self._execute_tool(tc["name"], tc["input"])
+                except Exception as e:
+                    result = f"Error: {e}"
                 yield {"type": "tool_done", "tool": tc["name"],
                        "input": tc["input"], "result": result}
                 results.append(self._compress_result(result))  # compress for history
 
+            # Always add tool results to history to avoid orphaned function_calls
             tool_result_msg = backend.make_tool_result_message(tool_calls, results)
             if "_multi" in tool_result_msg:
                 self.conversation_history.extend(tool_result_msg["_multi"])

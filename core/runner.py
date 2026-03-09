@@ -72,6 +72,12 @@ class CPPTrajRunner:
                 "elapsed": float,
             }
         """
+        # Ensure script ends with 'go' so cpptraj actually executes the analysis
+        stripped = script.strip()
+        last_line = stripped.splitlines()[-1].strip().lower() if stripped else ""
+        if last_line not in ("go", "run", "quit"):
+            script = stripped + "\ngo\n"
+
         # Write the script to a temp file
         script_path = self.work_dir / f"script_{int(time.time())}.cpptraj"
         script_path.write_text(script, encoding='utf-8')

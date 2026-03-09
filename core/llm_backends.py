@@ -34,16 +34,14 @@ PROVIDER_DEFAULTS = {
         "models": ["claude-haiku-4-5-20251001", "claude-sonnet-4-6", "claude-opus-4-6"],
     },
     "openai": {
-        "base_url": "https://api.openai.com/v1",
         "default_model": "gpt-4o-mini",
         "label": "OpenAI",
-        "models": ["gpt-4o-mini", "gpt-4o"],
+        "models": ["gpt-4o-mini"],
     },
     "gemini": {
-        "base_url": "https://generativelanguage.googleapis.com/v1beta/openai/",
-        "default_model": "gemini-2.0-flash",
+        "default_model": "gemini-2.5-flash",
         "label": "Google Gemini",
-        "models": ["gemini-2.0-flash", "gemini-1.5-flash"],
+        "models": ["gemini-2.5-flash"],
     },
 }
 
@@ -239,6 +237,222 @@ class OpenAICompatBackend(LLMBackend):
         ]}
 
 
+class OpenAIResponsesBackend(LLMBackend):
+    """
+    Uses the OpenAI Responses API (client.responses.create).
+    Required for accounts that don't have Chat Completions access for newer models.
+    """
+
+    def __init__(self, api_key: str, model: str, provider_name: str = "openai"):
+        from openai import OpenAI
+        self._provider = provider_name
+        self._model = model
+        self._client = OpenAI(api_key=api_key or "no-key")
+
+    @property
+    def provider(self): return self._provider
+    @property
+    def model(self): return self._model
+
+    def _resp_tools(self, tools):
+        out = []
+        for t in tools:
+            if "function" in t:
+                fn = t["function"]
+                out.append({"type": "function", "name": fn["name"],
+                            "description": fn.get("description", ""),
+                            "parameters": fn.get("parameters", {"type": "object", "properties": {}})})
+            else:
+                out.append({"type": "function", "name": t["name"],
+                            "description": t.get("description", ""),
+                            "parameters": t.get("input_schema", {"type": "object", "properties": {}})})
+        return out
+
+    def _to_input(self, messages: list) -> list:
+        """Convert internal chat history to Responses API input items."""
+        items = []
+        for msg in messages:
+            role = msg.get("role", "")
+
+            # Tool results stored as _multi
+            if "_multi" in msg:
+                for tm in msg["_multi"]:
+                    items.append({"type": "function_call_output",
+                                  "call_id": tm["tool_call_id"],
+                                  "output": tm["content"]})
+                continue
+
+            # Assistant message (may have tool_calls)
+            if role == "assistant":
+                content = msg.get("content") or ""
+                if content:
+                    items.append({"role": "assistant", "content": content})
+                for tc in msg.get("tool_calls", []):
+                    items.append({"type": "function_call",
+                                  "call_id": tc["id"],
+                                  "name": tc["function"]["name"],
+                                  "arguments": tc["function"]["arguments"]})
+                continue
+
+            # Plain user/tool messages
+            if role == "user":
+                items.append({"role": "user", "content": msg.get("content") or ""})
+            elif role == "tool":
+                items.append({"type": "function_call_output",
+                              "call_id": msg.get("tool_call_id", ""),
+                              "output": msg.get("content") or ""})
+        return items
+
+    def chat(self, messages, tools, system):
+        resp_tools = self._resp_tools(tools)
+        input_items = self._to_input(messages)
+        kwargs: dict[str, Any] = dict(model=self._model, input=input_items, instructions=system)
+        if resp_tools:
+            kwargs["tools"] = resp_tools
+
+        response = self._client.responses.create(**kwargs)
+
+        text_parts: list[str] = []
+        tool_calls: list[dict] = []
+        for item in response.output:
+            item_type = getattr(item, "type", "")
+            if item_type == "message":
+                for block in getattr(item, "content", []):
+                    if getattr(block, "type", "") == "output_text":
+                        text_parts.append(block.text)
+            elif item_type == "function_call":
+                try:
+                    inp = json.loads(item.arguments)
+                except Exception:
+                    inp = {}
+                tool_calls.append({"id": item.call_id, "name": item.name, "input": inp})
+
+        return "\n".join(text_parts), tool_calls, bool(tool_calls)
+
+    def stream_chat(self, messages, tools, system):
+        # Use non-streaming chat for reliable tool call extraction.
+        # Complex streaming accumulation of function call arguments is error-prone.
+        text, tool_calls, _ = self.chat(messages, tools, system)
+        if text:
+            yield ("text", text)
+        yield ("tool_calls", tool_calls)
+        yield ("stop_reason", "tool_calls" if tool_calls else "end_turn")
+
+    def make_assistant_message(self, text, tool_calls):
+        msg: dict[str, Any] = {"role": "assistant", "content": text or ""}
+        if tool_calls:
+            msg["tool_calls"] = [
+                {"id": tc["id"], "type": "function",
+                 "function": {"name": tc["name"], "arguments": json.dumps(tc["input"])}}
+                for tc in tool_calls
+            ]
+        return msg
+
+    def make_tool_result_message(self, tool_calls, results):
+        return {"_multi": [
+            {"role": "tool", "tool_call_id": tc["id"], "content": r}
+            for tc, r in zip(tool_calls, results)
+        ]}
+
+
+class GeminiNativeBackend(LLMBackend):
+    """Native Google Generative AI backend — works with any AI Studio key."""
+
+    def __init__(self, api_key: str, model: str = "gemini-2.5-flash"):
+        import google.generativeai as genai
+        self._genai = genai
+        self._model_name = model
+        genai.configure(api_key=api_key or "no-key")
+
+    @property
+    def provider(self): return "gemini"
+    @property
+    def model(self): return self._model_name
+
+    def _gemini_tools(self, tools):
+        protos = self._genai.protos
+        declarations = []
+        for t in tools:
+            if "function" in t:
+                fn, params = t["function"], t["function"].get("parameters", {})
+            else:
+                fn, params = t, t.get("input_schema", {})
+            props = {}
+            for pname, pschema in params.get("properties", {}).items():
+                ptype = pschema.get("type", "string").upper()
+                gemini_type = getattr(protos.Type, ptype, protos.Type.STRING)
+                props[pname] = protos.Schema(type=gemini_type,
+                                             description=pschema.get("description", ""))
+            declarations.append(protos.FunctionDeclaration(
+                name=fn["name"] if "function" in t else t["name"],
+                description=fn.get("description", ""),
+                parameters=protos.Schema(type=protos.Type.OBJECT,
+                                         properties=props,
+                                         required=params.get("required", [])),
+            ))
+        return [protos.Tool(function_declarations=declarations)]
+
+    def _to_contents(self, messages):
+        protos = self._genai.protos
+        contents = []
+        for msg in messages:
+            role = msg.get("role", "")
+            if "_fn_responses" in msg:
+                parts = [protos.Part(function_response=protos.FunctionResponse(
+                             name=fr["name"], response={"result": fr["response"]}))
+                         for fr in msg["_fn_responses"]]
+                contents.append(protos.Content(role="user", parts=parts))
+            elif role == "user":
+                contents.append(protos.Content(role="user",
+                    parts=[protos.Part(text=msg.get("content") or "")]))
+            elif role in ("assistant", "model"):
+                parts = []
+                if msg.get("content"):
+                    parts.append(protos.Part(text=msg["content"]))
+                for fc in msg.get("_fn_calls", []):
+                    parts.append(protos.Part(function_call=protos.FunctionCall(
+                        name=fc["name"], args=fc["args"])))
+                if parts:
+                    contents.append(protos.Content(role="model", parts=parts))
+        return contents
+
+    def chat(self, messages, tools, system):
+        model = self._genai.GenerativeModel(
+            self._model_name,
+            tools=self._gemini_tools(tools) if tools else None,
+            system_instruction=system,
+        )
+        contents = self._to_contents(messages)
+        response = model.generate_content(contents)
+        text_parts, tool_calls = [], []
+        for part in response.parts:
+            if hasattr(part, "text") and part.text:
+                text_parts.append(part.text)
+            elif hasattr(part, "function_call") and part.function_call.name:
+                fc = part.function_call
+                tool_calls.append({"id": fc.name, "name": fc.name, "input": dict(fc.args)})
+        return "\n".join(text_parts), tool_calls, bool(tool_calls)
+
+    def stream_chat(self, messages, tools, system):
+        text, tool_calls, _ = self.chat(messages, tools, system)
+        if text:
+            yield ("text", text)
+        yield ("tool_calls", tool_calls)
+        yield ("stop_reason", "tool_calls" if tool_calls else "end_turn")
+
+    def make_assistant_message(self, text, tool_calls):
+        msg: dict[str, Any] = {"role": "model", "content": text or ""}
+        if tool_calls:
+            msg["_fn_calls"] = [{"name": tc["name"], "args": tc["input"]} for tc in tool_calls]
+        return msg
+
+    def make_tool_result_message(self, tool_calls, results):
+        return {"role": "user", "_fn_responses": [
+            {"name": tc["name"], "response": r}
+            for tc, r in zip(tool_calls, results)
+        ]}
+
+
 def create_backend(provider: str, api_key: str = "", model: str = "", base_url: str = "") -> LLMBackend:
     provider = provider.lower().strip()
     defaults = PROVIDER_DEFAULTS.get(provider, PROVIDER_DEFAULTS["openai"])
@@ -247,4 +461,8 @@ def create_backend(provider: str, api_key: str = "", model: str = "", base_url: 
 
     if provider == "claude":
         return ClaudeBackend(api_key=api_key, model=model)
+    if provider == "openai":
+        return OpenAIResponsesBackend(api_key=api_key, model=model)
+    if provider == "gemini":
+        return GeminiNativeBackend(api_key=api_key, model=model)
     return OpenAICompatBackend(api_key=api_key, model=model, base_url=base_url, provider_name=provider)

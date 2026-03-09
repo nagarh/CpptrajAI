@@ -286,7 +286,7 @@
     user-select: none;
   }
   .line-numbers span { display: block; padding: 0 12px; line-height: 22px; }
-  #editor {
+  #editor, #pyEditor {
     flex: 1;
     background: var(--bg);
     border: none;
@@ -299,7 +299,7 @@
     resize: none;
     white-space: pre;
     overflow: auto;
-    tab-size: 2;
+    tab-size: 4;
     caret-color: var(--accent);
   }
   .editor-status {
@@ -547,7 +547,7 @@
   .avatar-a { background: var(--accent2); color: #000; }
   .bubble {
     max-width: 96%; padding: 8px 11px; border-radius: 8px;
-    font-size: 12px; line-height: 1.55; overflow-x: auto;
+    font-size: 13.5px; line-height: 1.6; overflow-x: auto;
   }
   .bubble-u { background: rgba(88,166,255,.12); border: 1px solid rgba(88,166,255,.25); }
   .bubble-a { background: var(--surface2); border: 1px solid var(--border); }
@@ -783,6 +783,10 @@
           <span class="file-tab-dot"></span>
           analysis.cpptraj
         </div>
+        <div class="file-tab" id="ctab-python" onclick="setCenterTab('python',this)" style="cursor:pointer">
+          <span class="file-tab-dot" style="background:#f0c040"></span>
+          script.py
+        </div>
         <div class="file-tab" id="ctab-viewer" onclick="setCenterTab('viewer',this)" style="cursor:pointer">
           ⬡ Viewer
         </div>
@@ -827,6 +831,48 @@
           <span class="t-line t-info">Upload topology + trajectory files, write your script, click ▶ Run.</span>
           <span class="t-line t-info">Use ⚙ in the header to set your Anthropic API key for the AI Agent.</span>
           <span class="t-line t-info">─────────────────────────────────────────────────────────</span>
+          <span class="t-line t-prompt">$  </span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Python editor pane (hidden by default) -->
+    <div id="center-python" style="display:none;flex-direction:column;flex:1;min-height:0">
+      <div class="editor-area">
+        <div class="editor-wrapper">
+          <div class="line-numbers" id="pyLineNumbers"></div>
+          <textarea id="pyEditor" spellcheck="false"
+            oninput="updatePyLineNumbers()" onscroll="syncPyScroll()"
+            placeholder="# Python script — runs in the work directory
+# Output files from cpptraj are available here
+# Use matplotlib to save plots:  plt.savefig('plot.png', dpi=150); plt.close()
+# Read .dat files:  pd.read_csv('file.dat', sep=r'\s+', comment='#')
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+"></textarea>
+        </div>
+      </div>
+      <div class="editor-status">
+        <div class="status-item"><span class="status-dot" style="background:#f0c040"></span> Ready</div>
+        <div class="status-item" id="pyCursorPos">Ln 1, Col 1</div>
+        <div class="status-item" id="pyLineCount">0 lines</div>
+        <div class="status-item" style="color:#f0c040;font-family:JetBrains Mono,monospace;font-size:10px">PYTHON SCRIPT</div>
+      </div>
+      <div class="run-bar">
+        <button class="btn btn-success" style="font-size:12px;background:#f0c040;border-color:#f0c040;color:#000" onclick="runPython()">▶ Run Python</button>
+        <div class="progress-bar" id="pyProgressBar"><div class="progress-fill" id="pyProgressFill"></div></div>
+        <span id="pyRunStatus" style="font-size:12px;color:var(--text-muted);font-family:JetBrains Mono,monospace"></span>
+        <button class="btn btn-ghost" style="font-size:11px;margin-left:auto" onclick="clearPyTerminal()">Clear Output</button>
+      </div>
+      <div class="h-divider"></div>
+      <div class="terminal">
+        <div class="terminal-header">
+          Python Output
+          <span id="pyTermStatus" style="color:var(--accent2)">● IDLE</span>
+        </div>
+        <div class="terminal-body" id="pyTermBody">
+          <span class="t-line t-info">Python script runner — output files are shared with the cpptraj workspace.</span>
           <span class="t-line t-prompt">$  </span>
         </div>
       </div>
@@ -967,6 +1013,7 @@
       </div>
       <div style="background:var(--surface);border-top:1px solid var(--border);padding:6px 12px;display:flex;gap:6px;flex-shrink:0">
         <button class="btn btn-ghost" style="font-size:10px;padding:3px 10px" onclick="resetChat()">Clear chat</button>
+        <button class="btn btn-ghost" style="font-size:10px;padding:3px 10px;color:var(--accent3);border-color:var(--accent3)" onclick="resetAll()">⟳ Reset All</button>
         <span id="activeModelBadge" style="font-size:10px;color:var(--text-dim);margin-left:auto;display:flex;align-items:center;font-family:JetBrains Mono,monospace">— · RAG</span>
       </div>
     </div>
@@ -1299,6 +1346,74 @@ function syncScroll() {
   document.getElementById('lineNumbers').scrollTop = document.getElementById('editor').scrollTop;
 }
 
+// ── Python editor helpers ────────────────────────────────────────────────────
+function updatePyLineNumbers() {
+  const ed    = document.getElementById('pyEditor');
+  const lines = ed.value.split('\n');
+  document.getElementById('pyLineNumbers').innerHTML = lines.map((_,i) => `<span>${i+1}</span>`).join('');
+  document.getElementById('pyLineCount').textContent = lines.length + ' lines';
+}
+
+function syncPyScroll() {
+  document.getElementById('pyLineNumbers').scrollTop = document.getElementById('pyEditor').scrollTop;
+}
+
+function clearPyTerminal() {
+  document.getElementById('pyTermBody').innerHTML =
+    '<span class="t-line t-info">Python output cleared.</span><span class="t-line t-prompt">$  </span>';
+}
+
+function pyTermLog(text, cls = '') {
+  const body = document.getElementById('pyTermBody');
+  const span = document.createElement('span');
+  span.className = 't-line' + (cls ? ' ' + cls : '');
+  span.textContent = text;
+  body.appendChild(span);
+  body.scrollTop = body.scrollHeight;
+}
+
+async function runPython() {
+  const script = document.getElementById('pyEditor').value.trim();
+  if (!script) return;
+
+  document.getElementById('pyTermStatus').textContent = '● RUNNING';
+  document.getElementById('pyTermStatus').style.color = 'var(--accent4)';
+  document.getElementById('pyProgressBar').style.display = 'block';
+  document.getElementById('pyProgressFill').style.width = '30%';
+  document.getElementById('pyRunStatus').textContent = 'Running…';
+
+  pyTermLog('');
+  pyTermLog('$ python script.py', 't-prompt');
+
+  try {
+    const r    = await fetch('/api/run_python', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({script}),
+    });
+    const data = await r.json();
+
+    if (data.error) { pyTermLog('Error: ' + data.error, 't-error'); }
+    else {
+      if (data.stdout) data.stdout.split('\n').forEach(l => pyTermLog(l, data.success ? '' : 't-warn'));
+      if (data.stderr) data.stderr.split('\n').filter(l=>l).forEach(l => pyTermLog(l, 't-error'));
+      pyTermLog(`─── ${data.success ? '✓ Done' : '✗ Failed'} in ${data.elapsed}s ───`, data.success ? 't-info' : 't-error');
+      if (data.success) await refreshOutputFiles();
+    }
+  } catch(e) {
+    pyTermLog('Network error: ' + e, 't-error');
+  }
+
+  document.getElementById('pyProgressFill').style.width = '100%';
+  document.getElementById('pyTermStatus').textContent = '● IDLE';
+  document.getElementById('pyTermStatus').style.color = 'var(--accent2)';
+  document.getElementById('pyRunStatus').textContent = '';
+  setTimeout(() => {
+    document.getElementById('pyProgressBar').style.display = 'none';
+    document.getElementById('pyProgressFill').style.width = '0%';
+  }, 800);
+}
+
 document.getElementById('editor').addEventListener('keydown', e => {
   if (e.key === 'Tab') {
     e.preventDefault();
@@ -1311,6 +1426,17 @@ document.getElementById('editor').addEventListener('keydown', e => {
 
 document.getElementById('editor').addEventListener('click',  e => updateCursor(e.target));
 document.getElementById('editor').addEventListener('keyup',   e => updateCursor(e.target));
+
+document.getElementById('pyEditor').addEventListener('keydown', e => {
+  if (e.key === 'Tab') {
+    e.preventDefault();
+    const ed = e.target, s = ed.selectionStart;
+    ed.value = ed.value.substring(0,s) + '    ' + ed.value.substring(ed.selectionEnd);
+    ed.selectionStart = ed.selectionEnd = s + 4;
+    updatePyLineNumbers();
+  }
+});
+document.getElementById('pyEditor').addEventListener('input', updatePyLineNumbers);
 
 function updateCursor(ed) {
   const txt   = ed.value.substring(0, ed.selectionStart);
@@ -1485,11 +1611,12 @@ function setRightTab(mode, el) {
 function setCenterTab(tab, el) {
   document.querySelectorAll('.file-tab').forEach(t => t.classList.remove('active'));
   el.classList.add('active');
-  const isViewer = tab === 'viewer';
-  document.getElementById('center-editor').style.display = isViewer ? 'none' : 'flex';
-  document.getElementById('center-viewer').style.display = isViewer ? 'flex' : 'none';
-  document.getElementById('saveScriptBtn').style.display = isViewer ? 'none' : '';
-  if (isViewer && mol3dViewer) setTimeout(() => mol3dViewer.resize(), 50);
+  document.getElementById('center-editor').style.display = tab === 'editor' ? 'flex' : 'none';
+  document.getElementById('center-python').style.display = tab === 'python' ? 'flex' : 'none';
+  document.getElementById('center-viewer').style.display = tab === 'viewer' ? 'flex' : 'none';
+  document.getElementById('saveScriptBtn').style.display = tab === 'viewer' ? 'none' : '';
+  if (tab === 'viewer' && mol3dViewer) setTimeout(() => mol3dViewer.resize(), 50);
+  if (tab === 'python') { updatePyLineNumbers(); }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1924,6 +2051,11 @@ async function sendChatMsg(msg) {
 
 async function stopChat() {
   try { await fetch('/api/chat/stop', {method:'POST'}); } catch {}
+
+  // Immediately hide all thinking dots without waiting for SSE stopped event
+  document.querySelectorAll('[id^="think_"]').forEach(el => { el.style.display = 'none'; });
+  document.querySelectorAll('.tool-acc .thinking').forEach(el => { el.style.display = 'none'; });
+
   const btn     = document.getElementById('chatSendBtn');
   const stopBtn = document.getElementById('chatStopBtn');
   btn.style.display     = '';
@@ -1939,6 +2071,27 @@ async function resetChat() {
     </div>`;
 }
 
+async function resetAll() {
+  if (!confirm('Reset everything? This will clear chat, uploaded files, and all output files.')) return;
+  try { await fetch('/api/reset_all', {method:'POST'}); } catch {}
+
+  // Clear chat
+  document.getElementById('chatMessages').innerHTML = `
+    <div class="no-select" style="padding:30px 10px">
+      <div class="big">✦</div>
+      <div style="font-size:12px">Session reset.</div>
+    </div>`;
+
+  // Clear terminal
+  clearTerminal();
+
+  // Clear output files panel
+  document.getElementById('outputFilesList').innerHTML = '<div class="no-select" style="padding:20px;font-size:11px;color:var(--text-muted);text-align:center">No output files yet.</div>';
+
+  // Clear uploaded file badges
+  document.getElementById('uploadedFiles').innerHTML = '';
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // SETTINGS — multi-provider
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1947,7 +2100,7 @@ const PROVIDER_INFO = {
   claude: {
     hint: 'Get your key at console.anthropic.com',
     models: [
-      { id:'claude-haiku-4-5-20251001', label:'Haiku 4.5  — fast & cheap (recommended)' },
+      { id:'claude-haiku-4-5-20251001', label:'Haiku 4.5  — fast & cheap' },
       { id:'claude-sonnet-4-6',         label:'Sonnet 4.6 — smarter, moderate cost' },
       { id:'claude-opus-4-6',           label:'Opus 4.6   — most capable, highest cost' },
     ],
@@ -1955,26 +2108,13 @@ const PROVIDER_INFO = {
   openai: {
     hint: 'Get your key at platform.openai.com',
     models: [
-      { id:'gpt-4o-mini',   label:'GPT-4o Mini  — $0.15/$0.60   (recommended)' },
-      { id:'gpt-4.1-nano',  label:'GPT-4.1 Nano — $0.10/$0.40   (cheapest reliable)' },
-      { id:'gpt-4.1-mini',  label:'GPT-4.1 Mini — $0.40/$1.60' },
-      { id:'gpt-4.1',       label:'GPT-4.1      — $2.00/$8.00   (high quality)' },
-      { id:'gpt-4o',        label:'GPT-4o       — $2.50/$10.00' },
-      { id:'gpt-5-nano',    label:'GPT-5 Nano   — $0.05/$0.40   (tier restricted)' },
-      { id:'gpt-5-mini',    label:'GPT-5 Mini   — $0.25/$2.00   (tier restricted)' },
-      { id:'gpt-5',         label:'GPT-5        — $1.25/$10.00  (tier restricted)' },
-      { id:'o4-mini',       label:'o4-mini      — $1.10/$4.40   (reasoning)' },
-      { id:'o3-mini',       label:'o3-mini      — $1.10/$4.40   (reasoning)' },
+      { id:'gpt-4o-mini', label:'GPT-4o Mini' },
     ],
   },
   gemini: {
     hint: 'Get a free key at aistudio.google.com',
     models: [
-      { id:'gemini-2.0-flash',       label:'Gemini 2.0 Flash   — free tier (recommended)' },
-      { id:'gemini-2.0-flash-lite',  label:'Gemini 2.0 Flash Lite — lightest & free' },
-      { id:'gemini-1.5-flash',       label:'Gemini 1.5 Flash   — free tier' },
-      { id:'gemini-1.5-pro',         label:'Gemini 1.5 Pro     — paid, more capable' },
-      { id:'gemini-2.0-pro-exp',     label:'Gemini 2.0 Pro Exp — experimental' },
+      { id:'gemini-2.5-flash', label:'Gemini 2.5 Flash' },
     ],
   },
 };
