@@ -5,8 +5,8 @@ RUN apt-get update && apt-get install -y \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Install cpptraj from conda-forge using mamba (faster solver)
-RUN mamba install -y -c conda-forge cpptraj && mamba clean -afy
+# Install cpptraj from bioconda (bioconda requires conda-forge as dependency channel)
+RUN mamba install -y -c bioconda -c conda-forge cpptraj && mamba clean -afy
 
 # Set working directory
 WORKDIR /app
