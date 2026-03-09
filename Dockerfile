@@ -1,12 +1,12 @@
-FROM continuumio/miniconda3:py311_23.5.2-0
+FROM continuumio/miniconda3:23.5.2-0
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Install ambertools from conda-forge (includes cpptraj, Python 3.11 build)
-RUN conda install -y -c conda-forge ambertools && conda clean -afy
+# Create isolated Python 3.11 environment for ambertools (cpptraj bundled inside)
+RUN conda create -n amber_env python=3.11 -c conda-forge ambertools -y && conda clean -afy
 
 # Set working directory
 WORKDIR /app
@@ -14,7 +14,7 @@ WORKDIR /app
 # Copy requirements first for layer caching
 COPY requirements.txt .
 
-# Install Python dependencies
+# Install Python dependencies into base env
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy application code
@@ -28,7 +28,7 @@ USER user
 EXPOSE 7860
 
 ENV PORT=7860
-ENV CPPTRAJ_PATH=/opt/conda/bin/cpptraj
+ENV CPPTRAJ_PATH=/opt/conda/envs/amber_env/bin/cpptraj
 ENV FLASK_SECRET_KEY=cpptrajgpt-hf-spaces-secret
 
 CMD ["python", "server.py"]
