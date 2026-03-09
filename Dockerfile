@@ -1,12 +1,12 @@
-FROM condaforge/mambaforge:latest
+FROM continuumio/miniconda3:py311_23.5.2-0
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Install cpptraj in its own isolated conda environment (avoids Python 3.12 pin conflict)
-RUN mamba create -n cpptraj_env -c conda-forge -c bioconda cpptraj -y && mamba clean -afy
+# Install ambertools from conda-forge (includes cpptraj, Python 3.11 build)
+RUN conda install -y -c conda-forge ambertools && conda clean -afy
 
 # Set working directory
 WORKDIR /app
@@ -14,7 +14,7 @@ WORKDIR /app
 # Copy requirements first for layer caching
 COPY requirements.txt .
 
-# Install Python dependencies into the base (Python 3.12) environment
+# Install Python dependencies
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy application code
@@ -28,7 +28,7 @@ USER user
 EXPOSE 7860
 
 ENV PORT=7860
-ENV CPPTRAJ_PATH=/opt/conda/envs/cpptraj_env/bin/cpptraj
+ENV CPPTRAJ_PATH=/opt/conda/bin/cpptraj
 ENV FLASK_SECRET_KEY=cpptrajgpt-hf-spaces-secret
 
 CMD ["python", "server.py"]
