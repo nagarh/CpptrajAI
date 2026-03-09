@@ -1,3 +1,13 @@
+---
+title: CpptrajGPT
+emoji: 🧬
+colorFrom: blue
+colorTo: purple
+sdk: docker
+pinned: false
+license: mit
+---
+
 # CpptrajGPT
 
 An AI-powered IDE for molecular dynamics trajectory analysis using **cpptraj** and large language models with RAG (Retrieval-Augmented Generation).
@@ -86,6 +96,8 @@ ollama serve
 | **Google (Gemini)** | [aistudio.google.com](https://aistudio.google.com) | Free tier available |
 
 No setup needed — just enter your API key in the IDE Settings (⚙ icon).
+
+> ⚠️ **Privacy Note (HuggingFace Space):** Your API key is used only for the duration of your browser session and is never logged or stored on disk. However, for sensitive work or large trajectories, we recommend **running locally** (see Quick Start above).
 
 ### 4. Run the IDE
 

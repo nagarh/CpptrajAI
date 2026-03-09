@@ -18,10 +18,12 @@ import json
 import os
 import tempfile
 import threading
+import time
 import traceback
+import uuid
 from pathlib import Path
 
-from flask import Flask, Response, jsonify, request, send_from_directory
+from flask import Flask, Response, jsonify, request, send_from_directory, session
 from flask_cors import CORS
 
 from core.knowledge_base import CPPTrajKnowledgeBase
@@ -34,39 +36,90 @@ from core.llm_backends import PROVIDER_DEFAULTS
 # ─────────────────────────────────────────────────────────────────────────────
 
 app = Flask(__name__, static_folder=".")
-CORS(app)
+app.secret_key = os.environ.get("FLASK_SECRET_KEY", os.urandom(32))
+CORS(app, supports_credentials=True)
 
-_stop_event = threading.Event()  # set to abort the current agent stream
-
-WORK_DIR = Path(tempfile.mkdtemp(prefix="cpptraj_ide_"))
 _CPPTRAJ_BIN = os.environ.get(
     "CPPTRAJ_PATH",
-    "/home/hn533621/.conda/envs/cpptraj_env/bin/cpptraj",
+    "/opt/conda/bin/cpptraj",
 )
-runner = CPPTrajRunner(work_dir=WORK_DIR, cpptraj_bin=_CPPTRAJ_BIN)
+# Fallback to local conda env if running locally
+if not Path(_CPPTRAJ_BIN).exists():
+    _CPPTRAJ_BIN = os.environ.get(
+        "CPPTRAJ_PATH",
+        "/home/hn533621/.conda/envs/cpptraj_env/bin/cpptraj",
+    )
+
+# Shared read-only knowledge base (safe to share across sessions)
 kb = CPPTrajKnowledgeBase()
 
-parm_file: Path | None = None
-traj_files: list[Path] = []
-_agent: TrajectoryAgent | None = None
+# ─────────────────────────────────────────────────────────────────────────────
+# Per-session state
+# ─────────────────────────────────────────────────────────────────────────────
 
-# Active LLM config (overridable at runtime via /api/set_provider)
-_llm_config: dict = {
-    "provider": "claude",
-    "api_key":  "",
-    "model":    "",
-    "base_url": "",
-}
+_SESSIONS: dict[str, dict] = {}
+_SESSIONS_LOCK = threading.Lock()
+_SESSION_TTL = 2 * 60 * 60  # 2 hours
 
 
-def get_agent() -> TrajectoryAgent | None:
-    global _agent
-    if not _llm_config.get("api_key") and _llm_config["provider"] != "ollama":
+def _make_session_state() -> dict:
+    work_dir = Path(tempfile.mkdtemp(prefix="cpptraj_ide_"))
+    return {
+        "runner": CPPTrajRunner(work_dir=work_dir, cpptraj_bin=_CPPTRAJ_BIN),
+        "parm_file": None,
+        "traj_files": [],
+        "agent": None,
+        "llm_config": {
+            "provider": "claude",
+            "api_key":  "",
+            "model":    "",
+            "base_url": "",
+        },
+        "stop_event": threading.Event(),
+        "last_active": time.time(),
+    }
+
+
+def _cleanup_expired_sessions():
+    """Remove sessions that have been inactive for > TTL."""
+    now = time.time()
+    with _SESSIONS_LOCK:
+        expired = [sid for sid, sd in _SESSIONS.items()
+                   if now - sd["last_active"] > _SESSION_TTL]
+        for sid in expired:
+            try:
+                _SESSIONS[sid]["runner"].cleanup()
+            except Exception:
+                pass
+            del _SESSIONS[sid]
+
+
+def get_sd() -> dict:
+    """Get or create per-session state dict."""
+    # Lazy cleanup (cheap check)
+    if len(_SESSIONS) > 50:
+        _cleanup_expired_sessions()
+
+    sid = session.get("sid")
+    if not sid or sid not in _SESSIONS:
+        sid = str(uuid.uuid4())
+        session["sid"] = sid
+        with _SESSIONS_LOCK:
+            _SESSIONS[sid] = _make_session_state()
+    else:
+        with _SESSIONS_LOCK:
+            _SESSIONS[sid]["last_active"] = time.time()
+    return _SESSIONS[sid]
+
+
+def get_agent(sd: dict) -> TrajectoryAgent | None:
+    cfg = sd["llm_config"]
+    if not cfg.get("api_key") and cfg["provider"] != "ollama":
         return None
-    if _agent is None:
-        _agent = TrajectoryAgent(runner=runner, kb=kb, **_llm_config)
-        _agent.set_files(parm_file, traj_files)
-    return _agent
+    if sd["agent"] is None:
+        sd["agent"] = TrajectoryAgent(runner=sd["runner"], kb=kb, **cfg)
+        sd["agent"].set_files(sd["parm_file"], sd["traj_files"])
+    return sd["agent"]
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -80,22 +133,22 @@ def index():
 
 @app.route("/api/upload", methods=["POST"])
 def upload():
-    global parm_file, traj_files
+    sd = get_sd()
 
     if "file" not in request.files:
         return jsonify({"error": "No file in request"}), 400
 
     f = request.files["file"]
-    saved = runner.save_uploaded_file(f)
+    saved = sd["runner"].save_uploaded_file(f)
 
     # Classify by extension; PDB files are inspected for multiple MODEL records
     ext = saved.suffix.lower()
     if ext in {".nc", ".ncdf", ".dcd", ".xtc", ".trr", ".crd", ".mdcrd", ".rst7"}:
-        if saved not in traj_files:
-            traj_files.append(saved)
+        if saved not in sd["traj_files"]:
+            sd["traj_files"].append(saved)
         kind = "trajectory"
     elif ext in {".prmtop", ".parm7", ".psf", ".gro", ".mol2"}:
-        parm_file = saved
+        sd["parm_file"] = saved
         kind = "topology"
     elif ext == ".pdb":
         # Multi-MODEL PDB → trajectory; single-model PDB → topology
@@ -105,19 +158,19 @@ def upload():
         except Exception:
             model_count = 0
         if model_count > 1:
-            if saved not in traj_files:
-                traj_files.append(saved)
+            if saved not in sd["traj_files"]:
+                sd["traj_files"].append(saved)
             kind = "trajectory"
         else:
-            parm_file = saved
+            sd["parm_file"] = saved
             kind = "topology"
     else:
         kind = "other"
 
     # Update agent context
-    ag = get_agent()
+    ag = get_agent(sd)
     if ag:
-        ag.set_files(parm_file, traj_files)
+        ag.set_files(sd["parm_file"], sd["traj_files"])
 
     return jsonify({
         "name": saved.name,
@@ -129,7 +182,8 @@ def upload():
 
 @app.route("/api/run_python", methods=["POST"])
 def run_python():
-    import subprocess, sys, time
+    import subprocess, sys as _sys
+    sd = get_sd()
     data   = request.get_json(silent=True) or {}
     script = data.get("script", "").strip()
     if not script:
@@ -137,9 +191,9 @@ def run_python():
     t0 = time.time()
     try:
         proc = subprocess.run(
-            [sys.executable, "-c", script],
+            [_sys.executable, "-c", script],
             capture_output=True, text=True, timeout=120,
-            cwd=str(WORK_DIR),
+            cwd=str(sd["runner"].work_dir),
         )
         elapsed = round(time.time() - t0, 2)
         return jsonify({
@@ -147,7 +201,7 @@ def run_python():
             "stdout":  proc.stdout[:8000],
             "stderr":  proc.stderr[:3000],
             "elapsed": elapsed,
-            "output_files": [f.name for f in runner.list_output_files()],
+            "output_files": [f.name for f in sd["runner"].list_output_files()],
         })
     except subprocess.TimeoutExpired:
         return jsonify({"success": False, "stdout": "", "stderr": "Timed out after 120s.", "elapsed": 120})
@@ -157,6 +211,7 @@ def run_python():
 
 @app.route("/api/run", methods=["POST"])
 def run_script():
+    sd = get_sd()
     data = request.get_json(silent=True) or {}
     script = data.get("script", "").strip()
 
@@ -164,10 +219,10 @@ def run_script():
         return jsonify({"error": "Empty script"}), 400
 
     # Inject real file paths where placeholders exist
-    if parm_file or traj_files:
-        script = runner.inject_paths_into_script(script, parm_file, traj_files)
+    if sd["parm_file"] or sd["traj_files"]:
+        script = sd["runner"].inject_paths_into_script(script, sd["parm_file"], sd["traj_files"])
 
-    result = runner.run_script(script)
+    result = sd["runner"].run_script(script)
 
     return jsonify({
         "success":      result["success"],
@@ -180,13 +235,14 @@ def run_script():
 
 @app.route("/api/chat", methods=["POST"])
 def chat():
+    sd = get_sd()
     data = request.get_json(silent=True) or {}
     message = data.get("message", "").strip()
 
     if not message:
         return jsonify({"error": "Empty message"}), 400
 
-    ag = get_agent()
+    ag = get_agent(sd)
     if ag is None:
         return jsonify({"error": "No LLM configured. Click ⚙ Settings to choose a provider and enter your API key."}), 400
 
@@ -210,20 +266,22 @@ def chat():
 
 @app.route("/api/chat/stream", methods=["POST"])
 def chat_stream():
+    sd = get_sd()
     data = request.get_json(silent=True) or {}
     message = data.get("message", "").strip()
     if not message:
         return jsonify({"error": "Empty message"}), 400
-    ag = get_agent()
+    ag = get_agent(sd)
     if ag is None:
         return jsonify({"error": "No LLM configured. Click ⚙ Settings to choose a provider and enter your API key."}), 400
 
-    _stop_event.clear()
+    stop_event = sd["stop_event"]
+    stop_event.clear()
 
     def generate():
         try:
             for event in ag.chat_stream(message):
-                if _stop_event.is_set():
+                if stop_event.is_set():
                     yield ("data: " + json.dumps({"type": "stopped"}, ensure_ascii=False) + "\n\n").encode("utf-8")
                     return
                 yield ("data: " + json.dumps(event, ensure_ascii=False) + "\n\n").encode("utf-8")
@@ -239,33 +297,35 @@ def chat_stream():
 
 @app.route("/api/chat/stop", methods=["POST"])
 def chat_stop():
-    _stop_event.set()
+    sd = get_sd()
+    sd["stop_event"].set()
     return jsonify({"ok": True})
 
 
 @app.route("/api/chat/reset", methods=["POST"])
 def chat_reset():
-    global _agent
-    if _agent:
-        _agent.reset_conversation()
+    sd = get_sd()
+    if sd["agent"]:
+        sd["agent"].reset_conversation()
     return jsonify({"ok": True})
 
 
 @app.route("/api/reset_all", methods=["POST"])
 def reset_all():
     """Reset everything: chat history, uploaded files, output files."""
-    global _agent, parm_file, traj_files
     import shutil
+    sd = get_sd()
 
     # Reset agent/chat history
-    if _agent:
-        _agent.reset_conversation()
+    if sd["agent"]:
+        sd["agent"].reset_conversation()
 
     # Clear uploaded file references
-    parm_file = None
-    traj_files = []
+    sd["parm_file"] = None
+    sd["traj_files"] = []
 
     # Delete all files in work dir and recreate it
+    runner = sd["runner"]
     if runner.work_dir.exists():
         shutil.rmtree(runner.work_dir)
     runner.work_dir.mkdir(parents=True, exist_ok=True)
@@ -277,7 +337,8 @@ def reset_all():
 
 @app.route("/api/files")
 def list_files():
-    files = runner.list_output_files()
+    sd = get_sd()
+    files = sd["runner"].list_output_files()
     return jsonify([
         {
             "name": f.name,
@@ -290,7 +351,8 @@ def list_files():
 
 @app.route("/api/file/<path:name>")
 def get_file(name):
-    fp = runner.work_dir / name
+    sd = get_sd()
+    fp = sd["runner"].work_dir / name
     if not fp.exists():
         return jsonify({"error": "Not found"}), 404
     from flask import send_file
@@ -307,22 +369,25 @@ def get_file(name):
 
 @app.route("/api/status")
 def status():
-    ag = _agent
+    sd = get_sd()
+    ag = sd["agent"]
+    cfg = sd["llm_config"]
     return jsonify({
-        "cpptraj":  runner.is_cpptraj_available(),
-        "parm":     parm_file.name if parm_file else None,
-        "trajs":    [f.name for f in traj_files],
-        "api_key":  bool(_llm_config.get("api_key")) or _llm_config["provider"] == "ollama",
-        "provider": _llm_config["provider"],
-        "model":    (ag.model if ag else None) or _llm_config.get("model", ""),
-        "work_dir": str(WORK_DIR),
+        "cpptraj":  sd["runner"].is_cpptraj_available(),
+        "parm":     sd["parm_file"].name if sd["parm_file"] else None,
+        "trajs":    [f.name for f in sd["traj_files"]],
+        "api_key":  bool(cfg.get("api_key")) or cfg["provider"] == "ollama",
+        "provider": cfg["provider"],
+        "model":    (ag.model if ag else None) or cfg.get("model", ""),
+        "work_dir": str(sd["runner"].work_dir),
     })
 
 
 @app.route("/api/prepare_viewer", methods=["POST"])
 def prepare_viewer():
     """Convert topology+trajectory to a multi-MODEL PDB for 3Dmol.js viewer."""
-    if not parm_file or not traj_files:
+    sd = get_sd()
+    if not sd["parm_file"] or not sd["traj_files"]:
         return jsonify({"error": "Upload topology and trajectory first."}), 400
 
     data = request.get_json(silent=True) or {}
@@ -330,7 +395,10 @@ def prepare_viewer():
     last_frame  = data.get("last_frame")
     frame_range = f" {first_frame} {int(last_frame)}" if last_frame else (f" {first_frame}" if first_frame > 1 else "")
 
-    out_pdb = WORK_DIR / "viewer_traj.pdb"
+    runner = sd["runner"]
+    parm_file = sd["parm_file"]
+    traj_files = sd["traj_files"]
+    out_pdb = runner.work_dir / "viewer_traj.pdb"
     script = f"""parm {parm_file}
 trajin {traj_files[0]}{frame_range}
 strip :WAT,HOH,TIP3,Na+,Cl-,NA,CL
@@ -359,7 +427,8 @@ go"""
 @app.route("/api/prepare_viewer_pdb", methods=["POST"])
 def prepare_viewer_pdb():
     """Use an already-uploaded PDB trajectory directly (no conversion needed)."""
-    pdb_traj = next((f for f in traj_files if f.suffix.lower() == ".pdb"), None)
+    sd = get_sd()
+    pdb_traj = next((f for f in sd["traj_files"] if f.suffix.lower() == ".pdb"), None)
     if pdb_traj:
         return jsonify({"filename": pdb_traj.name})
     return jsonify({"error": "No PDB trajectory found."}), 404
@@ -381,7 +450,7 @@ def get_test_file(name):
 
 @app.route("/api/set_provider", methods=["POST"])
 def set_provider():
-    global _agent, _llm_config
+    sd = get_sd()
     data = request.get_json(silent=True) or {}
     provider = data.get("provider", "").strip()
     api_key  = data.get("api_key", "").strip()
@@ -397,9 +466,9 @@ def set_provider():
     if not provider:
         return jsonify({"error": "provider is required"}), 400
 
-    _llm_config = {"provider": provider, "api_key": api_key,
-                   "model": model, "base_url": base_url}
-    _agent = None   # force rebuild
+    sd["llm_config"] = {"provider": provider, "api_key": api_key,
+                        "model": model, "base_url": base_url}
+    sd["agent"] = None  # force rebuild
     return jsonify({"ok": True, "provider": provider,
                     "model": model or PROVIDER_DEFAULTS.get(provider, {}).get("default_model", "")})
 
