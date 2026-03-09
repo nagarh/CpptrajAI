@@ -958,11 +958,11 @@ import matplotlib.pyplot as plt
       </div>
       <div style="padding:8px 10px;border-bottom:1px solid var(--border)">
         <div style="font-size:11px;color:var(--text-muted);margin-bottom:8px;line-height:1.5">
-          Solvated protein · 30070 atoms · 9157 res · 10 frames · AMBER NetCDF
+          Solvated protein · 3216 atoms · 203 res · 2 frames · Multi-MODEL PDB
         </div>
         <div style="display:flex;gap:6px;flex-wrap:wrap">
           <button class="btn btn-ghost" style="font-size:10px;padding:4px 10px" onclick="loadTestTopology()">⬇ Topology (.prmtop)</button>
-          <button class="btn btn-ghost" style="font-size:10px;padding:4px 10px" onclick="loadTestTrajectory()">⬇ Trajectory (.nc)</button>
+          <button class="btn btn-ghost" style="font-size:10px;padding:4px 10px" onclick="loadTestTrajectory()">⬇ Trajectory (.pdb)</button>
           <button class="btn btn-primary" style="font-size:10px;padding:4px 10px;margin-top:4px;width:100%" onclick="loadTestScript()">⊕ Load example script</button>
         </div>
       </div>
@@ -2313,13 +2313,13 @@ async function loadTestFile(filename) {
 }
 
 function loadTestTopology()   { loadTestFile('protein.prmtop'); }
-function loadTestTrajectory() { loadTestFile('mdin_prod.nc'); }
+function loadTestTrajectory() { loadTestFile('test_traj.pdb'); }
 
 function loadTestScript() {
-  document.getElementById('editor').value = `# Example analysis — solvated protein (AMBER)
+  document.getElementById('editor').value = `# Example analysis — solvated protein (water-stripped PDB)
 # Load test files from the Files panel first, then click ▶ Run
 parm  protein.prmtop
-trajin mdin_prod.nc
+trajin test_traj.pdb
 
 # Strip solvent and image trajectory
 strip :WAT,Na+,Cl-

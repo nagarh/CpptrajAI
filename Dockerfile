@@ -1,13 +1,12 @@
-FROM continuumio/miniconda3:latest
+FROM condaforge/mambaforge:latest
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
-    build-essential \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Install cpptraj from conda-forge
-RUN conda install -y -c conda-forge cpptraj && conda clean -afy
+# Install cpptraj from conda-forge using mamba (faster solver)
+RUN mamba install -y -c conda-forge cpptraj && mamba clean -afy
 
 # Set working directory
 WORKDIR /app
