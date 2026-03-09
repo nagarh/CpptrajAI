@@ -6,7 +6,7 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Create isolated Python 3.11 environment for ambertools (cpptraj bundled inside)
-RUN conda create -n amber_env python=3.11 -c conda-forge ambertools -y && conda clean -afy
+RUN conda create -n amber_env -c conda-forge python=3.11 ambertools -y && conda clean -afy
 
 # Set working directory
 WORKDIR /app
