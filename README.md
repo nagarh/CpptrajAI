@@ -12,7 +12,7 @@ license: mit
 
 An AI-powered IDE for molecular dynamics (MD) trajectory analysis using **cpptraj** and large language models with Retrieval-Augmented Generation (RAG).
 
-> **Just describe your analysis in plain English — CpptrajAI writes and runs the cpptraj script for you, then interprets the results.**
+> **Type a prompt like "Calculate RMSD of the protein backbone" — CpptrajAI writes the cpptraj script, runs it, and reports the results.**
 
 ---
 
