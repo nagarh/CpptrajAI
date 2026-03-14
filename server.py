@@ -39,8 +39,6 @@ from core.llm_backends import PROVIDER_DEFAULTS
 app = Flask(__name__, static_folder=".")
 app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
 app.secret_key = os.environ.get("FLASK_SECRET_KEY", os.urandom(32))
-app.config["SESSION_COOKIE_SAMESITE"] = "None"
-app.config["SESSION_COOKIE_SECURE"] = True
 CORS(app, supports_credentials=True)
 
 _CPPTRAJ_BIN = os.environ.get(
