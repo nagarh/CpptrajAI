@@ -31,7 +31,6 @@ An AI-powered IDE for molecular dynamics (MD) trajectory analysis using **cpptra
 - [Supported File Formats](#supported-file-formats)
 - [Architecture](#architecture)
 - [Docker / HuggingFace Spaces](#docker--huggingface-spaces)
-- [Troubleshooting](#troubleshooting)
 
 ---
 
@@ -377,39 +376,6 @@ Open **http://localhost:7860**
 | `CPPTRAJ_PATH` | `cpptraj` | Path to cpptraj binary |
 | `PORT` | `8502` | Server port (7860 for HuggingFace) |
 | `FLASK_SECRET_KEY` | auto-generated | Flask session secret |
-
----
-
-## Troubleshooting
-
-### `cpptraj: command not found`
-- Install via conda: `conda install -c conda-forge ambertools` (Python 3.11 required)
-- Or set `export CPPTRAJ_PATH=/full/path/to/cpptraj`
-
-### AI agent writes wrong command names
-- The RAG system provides exact syntax from the manual on demand
-- If it still happens, be more specific: *"calculate radius of gyration"* instead of *"calculate Rg"*
-
-### Script runs but no output files appear
-- Ensure analysis commands include an output file (`out rmsd.dat`)
-- The `go` command is appended automatically if missing
-
-### Port 8502 already in use
-```bash
-lsof -ti:8502 | xargs kill -9
-python server.py
-```
-
-### Large trajectories time out
-- Default timeout is 300 seconds. Sub-sample for very large systems:
-  ```
-  trajin mdin_prod.nc 1 last 10   # every 10th frame
-  ```
-
-### Ollama model not responding
-- Ensure Ollama is running: `ollama serve`
-- Check the base URL in Settings matches where Ollama is running
-- Verify the model is pulled: `ollama list`
 
 ---
 
