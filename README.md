@@ -30,7 +30,8 @@ An AI-powered IDE for molecular dynamics (MD) trajectory analysis using **cpptra
 - [Supported Analyses](#supported-analyses)
 - [Supported File Formats](#supported-file-formats)
 - [Architecture](#architecture)
-- [Docker / HuggingFace Spaces](#docker--huggingface-spaces)
+- [Agent Execution](#agent-execution)
+- [Docker](#docker)
 
 ---
 
@@ -39,7 +40,7 @@ An AI-powered IDE for molecular dynamics (MD) trajectory analysis using **cpptra
 | Feature | Description |
 |---------|-------------|
 | **AI Agent** | Natural-language prompt → cpptraj script → execution → result interpretation |
-| **RAG over cpptraj manual** | On-demand TF-IDF retrieval from CpptrajManual.pdf — the AI searches documentation only when it needs exact syntax |
+| **RAG over cpptraj manual** | On-demand TF-IDF retrieval from cached cpptraj syntax — the AI searches documentation only when it needs exact syntax |
 | **Multi-provider AI** | Claude (Anthropic), GPT-4o (OpenAI), Gemini (Google), or any Ollama local model |
 | **Local model support** | Run any Ollama model (qwen3, llama3, deepseek, etc.) on your own hardware — no API key needed |
 | **Script Editor** | Write/edit cpptraj scripts manually with one-click execution |
