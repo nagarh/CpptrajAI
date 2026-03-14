@@ -426,9 +426,43 @@ MIT License. See [LICENSE](LICENSE) for details.
 
 ---
 
-## Acknowledgements
+## Tools Used
 
-- [cpptraj](https://github.com/Amber-MD/cpptraj) — Roe & Cheatham, *J. Chem. Theory Comput.* 2013
-- [Anthropic Claude](https://anthropic.com), [OpenAI](https://openai.com), [Google Gemini](https://ai.google.dev), [Ollama](https://ollama.com)
-- [3Dmol.js](https://3dmol.csb.pitt.edu) for molecular visualization
-- [Plotly](https://plotly.com) for interactive plots
+| Tool | Purpose |
+|------|---------|
+| [cpptraj](https://github.com/Amber-MD/cpptraj) | MD trajectory analysis engine |
+| [Anthropic Claude](https://anthropic.com) | AI backend (cloud) |
+| [OpenAI GPT-4o](https://openai.com) | AI backend (cloud) |
+| [Google Gemini](https://ai.google.dev) | AI backend (cloud) |
+| [Ollama](https://ollama.com) | Local model inference |
+| [3Dmol.js](https://3dmol.csb.pitt.edu) | 3D molecular visualization |
+| [Plotly](https://plotly.com) | Interactive plots |
+| [Flask](https://flask.palletsprojects.com) | Backend web framework |
+| [scikit-learn](https://scikit-learn.org) | TF-IDF RAG pipeline |
+
+---
+
+## Citation
+
+If you use CpptrajAI in your work, please cite:
+
+```bibtex
+@software{CpptrajAI,
+  title  = {CpptrajAI: AI-Powered IDE for Molecular Dynamics Trajectory Analysis},
+  author = {Nagar, Hemant},
+  year   = {2025},
+  url    = {https://github.com/nagarh/CpptrajAI}
+}
+```
+
+Please also cite **cpptraj**:
+
+> Roe, D.R.; Cheatham, T.E. PTRAJ and CPPTRAJ: Software for Processing and Analysis of Molecular Dynamics Trajectory Data. *J. Chem. Theory Comput.* **2013**, 9, 3084–3095.
+
+---
+
+## Contact
+
+- **Author**: Hemant Nagar
+- **Email**: hn533621@ohio.edu
+- **GitHub**: [github.com/nagarh](https://github.com/nagarh)
