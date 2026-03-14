@@ -21,7 +21,6 @@ An AI-powered IDE for molecular dynamics (MD) trajectory analysis using **cpptra
 - [Features](#features)
 - [Quick Start](#quick-start)
 - [AI Backend Setup](#ai-backend-setup)
-- [Interface Guide](#interface-guide)
 - [Uploading Files](#uploading-files)
 - [Using the AI Agent](#using-the-ai-agent)
 - [Script Editor](#script-editor)
@@ -140,31 +139,6 @@ In CpptrajAI Settings:
 5. Click **Save**
 
 > **Privacy:** API keys are stored only in your browser session and are never written to disk or logged.
-
----
-
-## Interface Guide
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│  CpptrajAI                              ⚙ Settings  🔄 Reset  │
-├──────────────┬──────────────────────────┬────────────────────────┤
-│              │  [AI Chat] [Script] [Py] │                        │
-│   Command    │                          │   Files & Results      │
-│   Reference  │   Chat / Editor area     │                        │
-│   (left)     │                          │   Output files list    │
-│              │                          │   Plots & data viewer  │
-│   Search bar │   Send / Run button      │   3D molecular viewer  │
-└──────────────┴──────────────────────────┴────────────────────────┘
-```
-
-### Panels
-
-| Panel | Description |
-|-------|-------------|
-| **Left — Command Reference** | Searchable list of all cpptraj commands with syntax. Click any command to insert it into the script editor. |
-| **Center — Tabs** | Three tabs: AI Chat, Script Editor, Python Editor |
-| **Right — Files & Results** | Uploaded files, output files, interactive plots, 3D viewer |
 
 ---
 
@@ -359,6 +333,19 @@ CpptrajAI/
 4. The top-2 most relevant manual chunks are returned to the model
 5. Cloud models (Claude, GPT-4o, Gemini) call the tool only when uncertain — local models call it before every script for reliability
 6. The AI writes scripts using exact command names from the retrieved documentation
+
+### Token cost optimisation
+
+Running an AI agent with tool calls can be expensive if not carefully managed. CpptrajAI applies several techniques to minimise token usage:
+
+| Technique | Saving |
+|-----------|--------|
+| **On-demand RAG** | `search_cpptraj_docs` is a tool the model calls only when it needs syntax — not injected into every message. Saves ~1500 tokens/request vs always-on RAG. |
+| **No cheatsheet in system prompt** | The full command cheatsheet was removed from the system prompt. The model uses the search tool instead. Saves ~1500 tokens/request. |
+| **Sliding conversation window** | Only the last 3 user turns are sent to the API — not the full history. Older turns are dropped. |
+| **Compressed tool results** | Large cpptraj stdout is trimmed to the first 8 lines + line count before storing in history. |
+| **Concise responses enforced** | The system prompt enforces 1-2 sentence summaries — no markdown tables, headers, or interpretation sections in replies. |
+| **No max_tokens for local models** | Ollama models run without an output token cap — free to generate as much as needed. Cloud models are capped at 4096 output tokens to control cost. |
 
 ### Multi-user isolation
 
