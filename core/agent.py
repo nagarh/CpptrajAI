@@ -87,7 +87,7 @@ You are an expert computational biophysicist specializing in MD simulation analy
 - NEVER describe what you are going to do. Just do it. No preamble, no step lists, no "Step 1 / Step 2".
 - NEVER show the user a script and ask them to run it. You run it.
 - If a previous script failed, fix it and call the tool again immediately. Do not explain the fix — just run it.
-- After running any script: 1-2 sentence summary of results only. No code, no explanations.
+- After running any script: 1-2 sentence summary MAXIMUM. No markdown tables, no bullet lists, no interpretation sections, no headers. Plain text only.
 - cpptraj task → run_cpptraj_script | plotting/stats → run_python_script | list files → list_output_files
 - After cpptraj finishes: read output, report key numbers, then STOP. Never auto-run Python after cpptraj.
 - run_python_script is ONLY for: plot, graph, chart, visualize, histogram, heatmap, statistics, stats, analyze further.
@@ -97,11 +97,16 @@ cpptraj syntax (spaces, NOT colons): `parm file.prmtop` not `parm: file.prmtop`.
 - ALWAYS strip :WAT before autoimage and before any RMSD/distance/secstruct analysis. Order: strip → autoimage → analysis. Without stripping water first, autoimage anchors to water molecules causing artificially huge RMSD (20-40 Å).
 - Output: `out rmsd.dat`. References: `first`, `refindex -1`. Masks: `@CA,C,N,O` `@CA` `:1-100` `!:WAT`
 
-## CRITICAL — cpptraj command names
-ALWAYS call search_cpptraj_docs BEFORE writing any cpptraj script — even for common analyses like rmsd or radgyr.
-Use ONLY the exact command name returned by the search (e.g. search returns "radgyr" → use `radgyr`, not `radiusgyration`).
-For analyses requiring multiple commands (e.g. PCA needs matrix + diagmatrix + projection), call search_cpptraj_docs multiple times until you have all the syntax you need.
+## cpptraj command names
+Write scripts directly — you know cpptraj syntax well.
+Only call search_cpptraj_docs when genuinely uncertain about an exact command name or obscure syntax.
 After search_cpptraj_docs returns results, IMMEDIATELY call run_cpptraj_script — never stop to explain or summarize the search results.
+
+## Multi-step workflows
+Each run_cpptraj_script call is a fresh cpptraj process — in-memory datasets do NOT persist between calls.
+- ALWAYS write every intermediate result to disk with `out filename` (matrix, diagmatrix, eigenvectors, etc.)
+- If a subsequent script needs data from a previous run, reload it from disk using `readdata filename name datasetname`
+- If unsure how many steps an analysis needs, call search_cpptraj_docs first to get the full workflow before writing the script.
 
 ## Python Environment
 Available packages: pandas, numpy, matplotlib, scikit-learn, scipy. NOT available: MDAnalysis, parmed, pytraj, openmm.
@@ -109,6 +114,7 @@ NEVER use `delim_whitespace=True` (deprecated in pandas 2.x) — always use `sep
 
 Python: `plt.savefig('f.png', dpi=150, bbox_inches='tight')` then `plt.close()`. Never plt.show().
 Read .dat files with pandas: `pd.read_csv('f.dat', sep=r'\\s+', comment='#')`. Print key stats to stdout.
+- Before plotting any matrix/heatmap: always print `data.min().min(), data.max().max()` to stdout to validate the actual data range. Never assume or manually normalize — use the real range for vmin/vmax.
 
 ## Residue Classification (critical — never misclassify)
 Protein residues (NOT ligands): ALA ARG ASN ASP CYS CYX GLN GLU GLY HIS HIE HID HIP ILE LEU LYS MET PHE PRO SER THR TRP TYR VAL
@@ -117,20 +123,9 @@ Water/solvent (NOT ligands): WAT HOH TIP3 TIP4
 Ions (NOT ligands): Na+ Cl- K+ MG CA ZN NA CL Mg2+ Ca2+
 Ligand = any residue that is NONE of the above.
 
-## Efficient Ligand Identification (use this approach, do it in ONE script)
-Run a single Python script using parmed or direct prmtop parsing to list unique residue names, then filter:
-```python
-import subprocess, re
-result = subprocess.run(['cpptraj', '-p', 'PRMTOP', '--resmask', '*'], capture_output=True, text=True)
-```
-OR run cpptraj with `resinfo *` and parse stdout — do this ONCE, not in a loop.
-Standard approach:
-```
-parm protein.prmtop
-resinfo *
-go
-```
-Then parse the output with run_python_script to filter non-ligand residues. Do not repeat the script if you get results — read what cpptraj printed.
+## Ligand and Residue Information
+The ## Topology Composition section at the top of every message already contains the ligand residue ID, name, atom count, and ready-to-use masks (e.g. ligand mask: :203, protein mask: :1-202).
+NEVER run resinfo, parmed, or any identification script — the information is already provided. Use the masks directly.
 """
 
 
@@ -160,10 +155,19 @@ class TrajectoryAgent:
     @staticmethod
     def _build_system_prompt(provider: str, model: str) -> str:
         prompt = SYSTEM_PROMPT
-        # qwen3 models think by default — prepend /no_think to skip reasoning chain
-        # and save tokens (thinking tokens count toward max_tokens)
-        if provider == "ollama" and "qwen3" in model.lower():
-            prompt = "/no_think\n" + prompt
+        if provider == "ollama":
+            # qwen3 models think by default — skip reasoning chain to save tokens
+            if "qwen3" in model.lower():
+                prompt = "/no_think\n" + prompt
+            # Local models are weaker — require doc search before every script
+            prompt = prompt.replace(
+                "## cpptraj command names\n"
+                "Write scripts directly — you know cpptraj syntax well.\n"
+                "Only call search_cpptraj_docs when genuinely uncertain about an exact command name or obscure syntax.",
+                "## cpptraj command names\n"
+                "ALWAYS call search_cpptraj_docs BEFORE writing any cpptraj script — even for common analyses.\n"
+                "Use ONLY the exact command name returned by the search."
+            )
         return prompt
 
     _PROTEIN_RES = {
@@ -277,10 +281,10 @@ class TrajectoryAgent:
                        for b in content):
                     real_user_idx.append(i)
 
-        # Keep the last 3 real turns; if fewer exist, return the full history
-        if len(real_user_idx) <= 3:
+        # Keep the last 2 real turns; if fewer exist, return the full history
+        if len(real_user_idx) <= 2:
             return history
-        return history[real_user_idx[-4]:]
+        return history[real_user_idx[-3]:]
 
     @staticmethod
     def _compress_result(result: str) -> str:
@@ -442,7 +446,7 @@ class TrajectoryAgent:
         })
 
         backend = self._backend
-        max_iterations = 10
+        max_iterations = 15
         iteration = 0
 
         while iteration < max_iterations:
