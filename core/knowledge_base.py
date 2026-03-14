@@ -84,7 +84,7 @@ CPPTRAJ_COMMANDS = {
     "hmassrepartition":   {"category": "Manipulation", "title": "H-mass Repartition (hmassrepartition)",   "description": "Hydrogen mass repartitioning for longer MD timesteps.", "syntax": "hmassrepartition [<mask>] [factor <f>]"},
     "lessplit":           {"category": "Manipulation", "title": "Split LES Trajectory (lessplit)",         "description": "Split LES trajectory into individual replicas.", "syntax": "lessplit [out <prefix>] [<fmt>]"},
     "makestructure":      {"category": "Manipulation", "title": "Build Structure (makestructure)",         "description": "Build structure using idealized geometry.", "syntax": "makestructure <sstype>:<res_range>[,...] [out <prefix>]"},
-    "minimage":           {"category": "Manipulation", "title": "Minimum Image (minimage)",                "description": "Apply minimum image convention for periodic distance.", "syntax": "minimage [<name>] <mask1> <mask2> [out <file>]"},
+    "minimage":           {"category": "Manipulation", "title": "Minimum Image (minimage)",                "description": "Apply minimum image convention for periodic distance.", "syntax": "minimage [SETNAME] <mask1> <mask2> [out <file>]"},
     "molinfo":            {"category": "Manipulation", "title": "Molecule Info (molinfo)",                 "description": "Print molecular information for atom mask.", "syntax": "molinfo [<mask>] [<topology tag>]"},
     "parmbox":            {"category": "Manipulation", "title": "Set Topology Box (parmbox)",              "description": "Set periodic box dimensions in topology.", "syntax": "parmbox {x <x> y <y> z <z> [alpha <a> beta <b> gamma <g>] | nobox}"},
     "parminfo":           {"category": "Manipulation", "title": "Topology Info (parminfo)",                "description": "Print topology information summary.", "syntax": "parminfo [<mask>] [<topology tag>]"},
@@ -105,51 +105,51 @@ CPPTRAJ_COMMANDS = {
     "updateparameters":   {"category": "Manipulation", "title": "Update Parameters (updateparameters)",    "description": "Update force field parameters in topology.", "syntax": "updateparameters {<bond_args>|<angle_args>|<dih_args>}"},
     "bondparminfo":       {"category": "Manipulation", "title": "Bond Parameter Info (bondparminfo)",      "description": "Print bond parameter information.", "syntax": "bondparminfo [<mask>] [<topology tag>]"},
     # ── Analysis ─────────────────────────────────────────────────────────────
-    "rmsd":               {"category": "Analysis",     "title": "RMSD (rmsd)",                            "description": "Calculate frame-by-frame RMSD of atoms relative to a reference. Use @CA,C,N,O for backbone. Most common MD analysis.", "syntax": "rmsd [<name>] [<mask>] [ref <tag>|first|reference] [out <file>] [nofit] [mass] [perres]"},
-    "atomicfluct":        {"category": "Analysis",     "title": "RMSF (atomicfluct)",                     "description": "Per-atom or per-residue root mean square fluctuation (B-factors). Use byres for per-residue.", "syntax": "atomicfluct [<name>] [<mask>] [out <file>] [byres] [byatom] [bfactor]"},
-    "radgyr":             {"category": "Analysis",     "title": "Radius of Gyration (radgyr)",            "description": "Calculate radius of gyration — measures compactness. Always use mass keyword.", "syntax": "radgyr [<name>] [<mask>] [out <file>] [mass] [tensor]"},
-    "hbond":              {"category": "Analysis",     "title": "Hydrogen Bonds (hbond)",                 "description": "Detect and track hydrogen bonds. Default: dist ≤ 3.5 Å, angle ≥ 135°. Use avgout for statistics.", "syntax": "hbond [<name>] [<mask>] [out <file>] [avgout <file>] [dist <A>] [angle <deg>] [series]"},
-    "secstruct":          {"category": "Analysis",     "title": "Secondary Structure (secstruct)",        "description": "Assign secondary structure using DSSP algorithm. H=helix, E=strand, T=turn, C=coil.", "syntax": "secstruct [<name>] [<mask>] [out <file>] [sumout <file>]"},
-    "dssp":               {"category": "Analysis",     "title": "DSSP Secondary Structure (dssp)",        "description": "DSSP secondary structure assignment — alias for secstruct.", "syntax": "dssp [<name>] [<mask>] [out <file>] [sumout <file>]"},
-    "cluster":            {"category": "Analysis",     "title": "Clustering (cluster)",                   "description": "Cluster trajectory frames by structural similarity. Use sieve for large trajectories.", "syntax": "cluster [<name>] [<mask>] [hieragglo|kmeans|dbscan] [epsilon <val>] [clusters <N>] [out <file>] [summary <file>] [repout <prefix>] [repfmt pdb]"},
-    "distance":           {"category": "Analysis",     "title": "Distance (distance)",                    "description": "Calculate distance between two atom masks (center-of-mass by default).", "syntax": "distance [<name>] <mask1> <mask2> [out <file>] [noimage] [geom]"},
-    "angle":              {"category": "Analysis",     "title": "Angle (angle)",                          "description": "Calculate angle between three atoms or groups. mask2 is the vertex.", "syntax": "angle [<name>] <mask1> <mask2> <mask3> [out <file>]"},
-    "dihedral":           {"category": "Analysis",     "title": "Dihedral (dihedral)",                    "description": "Calculate dihedral (torsion) angle from four atoms. Output in −180 to +180 degrees.", "syntax": "dihedral [<name>] <mask1> <mask2> <mask3> <mask4> [out <file>]"},
+    "rmsd":               {"category": "Analysis",     "title": "RMSD (rmsd)",                            "description": "Calculate frame-by-frame RMSD of atoms relative to a reference. Use @CA,C,N,O for backbone. Most common MD analysis.", "syntax": "rmsd [SETNAME] [<mask>] [ref <tag>|first|reference] [out <file>] [nofit] [mass] [perres]"},
+    "atomicfluct":        {"category": "Analysis",     "title": "RMSF (atomicfluct)",                     "description": "Per-atom or per-residue root mean square fluctuation (B-factors). Use byres for per-residue.", "syntax": "atomicfluct [SETNAME] [<mask>] [out <file>] [byres] [byatom] [bfactor]"},
+    "radgyr":             {"category": "Analysis",     "title": "Radius of Gyration (radgyr)",            "description": "Calculate radius of gyration — measures compactness. Always use mass keyword.", "syntax": "radgyr [SETNAME] [<mask>] [out <file>] [mass] [tensor]"},
+    "hbond":              {"category": "Analysis",     "title": "Hydrogen Bonds (hbond)",                 "description": "Detect and track hydrogen bonds. Default: dist ≤ 3.5 Å, angle ≥ 135°. Use avgout for statistics.", "syntax": "hbond [SETNAME] [<mask>] [out <file>] [avgout <file>] [dist <A>] [angle <deg>] [series]"},
+    "secstruct":          {"category": "Analysis",     "title": "Secondary Structure (secstruct)",        "description": "Assign secondary structure using DSSP algorithm. H=helix, E=strand, T=turn, C=coil.", "syntax": "secstruct [SETNAME] [<mask>] [out <file>] [sumout <file>]"},
+    "dssp":               {"category": "Analysis",     "title": "DSSP Secondary Structure (dssp)",        "description": "DSSP secondary structure assignment — alias for secstruct.", "syntax": "dssp [SETNAME] [<mask>] [out <file>] [sumout <file>]"},
+    "cluster":            {"category": "Analysis",     "title": "Clustering (cluster)",                   "description": "Cluster trajectory frames by structural similarity. Use sieve for large trajectories.", "syntax": "cluster [SETNAME] [<mask>] [hieragglo|kmeans|dbscan] [epsilon <val>] [clusters <N>] [out <file>] [summary <file>] [repout <prefix>] [repfmt pdb]"},
+    "distance":           {"category": "Analysis",     "title": "Distance (distance)",                    "description": "Calculate distance between two atom masks (center-of-mass by default).", "syntax": "distance [SETNAME] <mask1> <mask2> [out <file>] [noimage] [geom]"},
+    "angle":              {"category": "Analysis",     "title": "Angle (angle)",                          "description": "Calculate angle between three atoms or groups. mask2 is the vertex.", "syntax": "angle [SETNAME] <mask1> <mask2> <mask3> [out <file>]"},
+    "dihedral":           {"category": "Analysis",     "title": "Dihedral (dihedral)",                    "description": "Calculate dihedral (torsion) angle from four atoms. Output in −180 to +180 degrees.", "syntax": "dihedral [SETNAME] <mask1> <mask2> <mask3> <mask4> [out <file>]"},
     "multidihedral":      {"category": "Analysis",     "title": "Backbone Dihedrals (multidihedral)",     "description": "Calculate phi, psi, omega, chi1-chi4 for all or selected residues.", "syntax": "multidihedral [phi] [psi] [omega] [chin] [<mask>] [out <file>]"},
     "phipsi":             {"category": "Analysis",     "title": "Phi/Psi Ramachandran (phipsi)",          "description": "Calculate Ramachandran phi/psi angles for residues.", "syntax": "phipsi [<mask>] [out <file>] [name <name>] [resrange <range>]"},
-    "surf":               {"category": "Analysis",     "title": "SASA (surf)",                            "description": "Calculate solvent-accessible surface area using LCPO algorithm. 1.4 Å probe.", "syntax": "surf [<name>] [<mask>] [out <file>] [solvradius <val>]"},
-    "molsurf":            {"category": "Analysis",     "title": "MSMS SASA (molsurf)",                    "description": "MSMS/molsurf solvent accessible surface area.", "syntax": "molsurf [<name>] [<mask>] [out <file>] [probe <r>]"},
-    "nativecontacts":     {"category": "Analysis",     "title": "Native Contacts (nativecontacts)",       "description": "Calculate fraction of native contacts (Q-value) relative to a reference structure.", "syntax": "nativecontacts [<name>] [<mask>] [ref <tag>|reference] [out <file>] [distance <cutoff>]"},
+    "surf":               {"category": "Analysis",     "title": "SASA (surf)",                            "description": "Calculate solvent-accessible surface area using LCPO algorithm. 1.4 Å probe.", "syntax": "surf [SETNAME] [<mask>] [out <file>] [solvradius <val>]"},
+    "molsurf":            {"category": "Analysis",     "title": "MSMS SASA (molsurf)",                    "description": "MSMS/molsurf solvent accessible surface area.", "syntax": "molsurf [SETNAME] [<mask>] [out <file>] [probe <r>]"},
+    "nativecontacts":     {"category": "Analysis",     "title": "Native Contacts (nativecontacts)",       "description": "Calculate fraction of native contacts (Q-value) relative to a reference structure.", "syntax": "nativecontacts [SETNAME] [<mask>] [ref <tag>|reference] [out <file>] [distance <cutoff>]"},
     "contacts":           {"category": "Analysis",     "title": "Contacts (contacts)",                    "description": "Calculate number of contacts. Legacy command — prefer nativecontacts.", "syntax": "contacts [first|reference|ref <ref>] [byresidue] [out <file>] [<mask>]"},
-    "density":            {"category": "Analysis",     "title": "Density Profile (density)",              "description": "Calculate number or mass density along an axis. Useful for membrane systems.", "syntax": "density [<name>] [<mask>] [out <file>] [x|y|z] [delta <dx>] [number|mass|electron]"},
-    "diffusion":          {"category": "Analysis",     "title": "Diffusion / MSD (diffusion)",            "description": "Calculate mean square displacement and diffusion coefficient. D = slope of MSD / 6.", "syntax": "diffusion [<name>] [<mask>] [out <file>] [time <dt>] [diffout <file>]"},
+    "density":            {"category": "Analysis",     "title": "Density Profile (density)",              "description": "Calculate number or mass density along an axis. Useful for membrane systems.", "syntax": "density [SETNAME] [<mask>] [out <file>] [x|y|z] [delta <dx>] [number|mass|electron]"},
+    "diffusion":          {"category": "Analysis",     "title": "Diffusion / MSD (diffusion)",            "description": "Calculate mean square displacement and diffusion coefficient. D = slope of MSD / 6.", "syntax": "diffusion [SETNAME] [<mask>] [out <file>] [time <dt>] [diffout <file>]"},
     "stfcdiffusion":      {"category": "Analysis",     "title": "STFC Diffusion (stfcdiffusion)",         "description": "Diffusion using STFC method for charged particles.", "syntax": "stfcdiffusion [<mask>] [out <file>] [time <dt>] [x|y|z|xy|xz|yz|xyz]"},
     "calcdiffusion":      {"category": "Analysis",     "title": "Calc Diffusion Coefficient (calcdiffusion)", "description": "Calculate diffusion coefficient from MSD data set.", "syntax": "calcdiffusion <msd_set> [out <file>] [time <ts>]"},
-    "watershell":         {"category": "Analysis",     "title": "Water Shell (watershell)",               "description": "Count water molecules in first and second solvation shells around a solute.", "syntax": "watershell [<name>] <mask> [out <file>] [lower <A>] [upper <A>]"},
+    "watershell":         {"category": "Analysis",     "title": "Water Shell (watershell)",               "description": "Count water molecules in first and second solvation shells around a solute.", "syntax": "watershell [SETNAME] <mask> [out <file>] [lower <A>] [upper <A>]"},
     "radial":             {"category": "Analysis",     "title": "Radial Distribution Function (radial)",  "description": "Calculate radial distribution function (RDF) g(r).", "syntax": "radial [out <file>] <spacing> <maximum> <solvent_mask> [<solute_mask>] [noimage]"},
     "volmap":             {"category": "Analysis",     "title": "Volumetric Map (volmap)",                "description": "Generate 3D volumetric density map (.dx file, viewable in VMD).", "syntax": "volmap <filename> [<mask>] [size <dx> <dy> <dz>] [center <mask>]"},
     "grid":               {"category": "Analysis",     "title": "3D Density Grid (grid)",                 "description": "Calculate 3D density grid.", "syntax": "grid <filename> <dx> <dy> <dz> [origin] [<mask>] [box]"},
-    "pucker":             {"category": "Analysis",     "title": "Ring Pucker (pucker)",                   "description": "Calculate Cremer-Pople ring pucker parameters for sugars/nucleic acids.", "syntax": "pucker [<name>] <m1> <m2> <m3> <m4> <m5> [<m6>] [out <file>] [amplitude] [theta]"},
+    "pucker":             {"category": "Analysis",     "title": "Ring Pucker (pucker)",                   "description": "Calculate Cremer-Pople ring pucker parameters for sugars/nucleic acids.", "syntax": "pucker [SETNAME] <m1> <m2> <m3> <m4> <m5> [<m6>] [out <file>] [amplitude] [theta]"},
     "multipucker":        {"category": "Analysis",     "title": "Multi Ring Pucker (multipucker)",        "description": "Calculate ring pucker for multiple residues.", "syntax": "multipucker [<mask>] [out <file>] [amplitude] [theta]"},
-    "matrix":             {"category": "Analysis",     "title": "Covariance Matrix (matrix)",             "description": "Build covariance or correlation matrix — first step for PCA.", "syntax": "matrix covar [<name>] [<mask>] [out <file>]"},
+    "matrix":             {"category": "Analysis",     "title": "Covariance Matrix (matrix)",             "description": "Build covariance or correlation matrix — first step for PCA.", "syntax": "matrix covar [SETNAME] [<mask>] [out <file>]"},
     "diagmatrix":         {"category": "Analysis",     "title": "Diagonalize Matrix (diagmatrix)",        "description": "Diagonalize a matrix to get eigenvalues and eigenvectors.", "syntax": "diagmatrix <matrixset> [out <evecfile>] [vecs <N>] [reduce] [mass <mask>]"},
-    "projection":         {"category": "Analysis",     "title": "PCA Projection (projection)",            "description": "Project trajectory onto eigenvectors from matrix/analyze modes for PCA.", "syntax": "projection [<name>] evecvecs <data> [<mask>] [out <file>] [beg <n>] [end <n>]"},
+    "projection":         {"category": "Analysis",     "title": "PCA Projection (projection)",            "description": "Project trajectory onto eigenvectors from matrix/analyze modes for PCA.", "syntax": "projection [SETNAME] evecvecs <data> [<mask>] [out <file>] [beg <n>] [end <n>]"},
     "modes":              {"category": "Analysis",     "title": "Normal Modes (modes)",                   "description": "Analyze normal modes from diagonalized matrix: fluct, displ, corr, eigenval, trajout.", "syntax": "modes {fluct|displ|corr|eigenval|trajout} name <modesname> [beg <b>] [end <e>] [out <file>]"},
     "tica":               {"category": "Analysis",     "title": "TICA (tica)",                            "description": "Time-lagged independent component analysis.", "syntax": "tica {crdset <COORDS>|data <sets>} [lag <lag>] [nvecs <N>] [out <file>]"},
     "atomiccorr":         {"category": "Analysis",     "title": "Atomic Correlation (atomiccorr)",        "description": "Atomic correlation matrix between atom displacements.", "syntax": "atomiccorr [out <file>] [cut <cut>] [<mask>] [datasave <set>]"},
-    "rms2d":              {"category": "Analysis",     "title": "Pairwise RMSD Matrix (rms2d)",           "description": "Pairwise RMSD matrix between all frame pairs.", "syntax": "rms2d [<name>] [<mask>] [out <file>] [mass] [nofit] [reftraj <traj>]"},
+    "rms2d":              {"category": "Analysis",     "title": "Pairwise RMSD Matrix (rms2d)",           "description": "Pairwise RMSD matrix between all frame pairs.", "syntax": "rms2d [SETNAME] [<mask>] [out <file>] [mass] [nofit] [reftraj <traj>]"},
     "rmsavgcorr":         {"category": "Analysis",     "title": "RMSD Running Average Correlation (rmsavgcorr)", "description": "Correlation of running-average RMSD vs window size.", "syntax": "rmsavgcorr [<mask>] [out <file>] [mass]"},
-    "symmrmsd":           {"category": "Analysis",     "title": "Symmetric RMSD (symmrmsd)",              "description": "RMSD with symmetry correction for equivalent atoms.", "syntax": "symmrmsd [<name>] [<mask>] [ref <ref>|first] [out <file>] [remap]"},
+    "symmrmsd":           {"category": "Analysis",     "title": "Symmetric RMSD (symmrmsd)",              "description": "RMSD with symmetry correction for equivalent atoms.", "syntax": "symmrmsd [SETNAME] [<mask>] [ref <ref>|first] [out <file>] [remap]"},
     "dihedralrms":        {"category": "Analysis",     "title": "Dihedral RMSD (dihedralrms)",            "description": "RMSD of dihedral angles between frames.", "syntax": "dihedralrms [<mask>] [out <file>] [mass] [nofit]"},
     "clusterdihedral":    {"category": "Analysis",     "title": "Dihedral Clustering (clusterdihedral)",  "description": "Cluster by dihedral angles.", "syntax": "clusterdihedral [<mask>] [out <file>] [clusterout <prefix>] [...dihedrals...]"},
-    "average":            {"category": "Analysis",     "title": "Average Structure (average)",            "description": "Compute average structure over trajectory frames.", "syntax": "average [<name>] <filename> [<fmt>] [<mask>] [start <s>] [stop <e>] [offset <o>]"},
-    "avgcoord":           {"category": "Analysis",     "title": "Average Coordinates (avgcoord)",         "description": "Average coordinates for each atom over trajectory.", "syntax": "avgcoord [<name>] [<mask>] [out <file>]"},
-    "avgbox":             {"category": "Analysis",     "title": "Average Box (avgbox)",                   "description": "Compute average box dimensions over trajectory.", "syntax": "avgbox [<name>] [out <file>]"},
-    "bounds":             {"category": "Analysis",     "title": "Bounding Box (bounds)",                  "description": "Calculate bounding box around atoms.", "syntax": "bounds [<name>] [<mask>] [out <file>] [dx <dx>] [offset <offset>]"},
-    "principal":          {"category": "Analysis",     "title": "Principal Axes (principal)",             "description": "Calculate principal axes and moments of inertia.", "syntax": "principal [<name>] [<mask>] [out <file>] [dorotation] [mass]"},
-    "dipole":             {"category": "Analysis",     "title": "Dipole Moment (dipole)",                 "description": "Calculate dipole moment of selection.", "syntax": "dipole [<name>] [<mask>] [out <file>] [<grid_options>]"},
-    "volume":             {"category": "Analysis",     "title": "Unit Cell Volume (volume)",              "description": "Calculate unit cell volume over trajectory.", "syntax": "volume [<name>] [out <file>]"},
-    "temperature":        {"category": "Analysis",     "title": "Temperature (temperature)",              "description": "Calculate instantaneous temperature from velocities.", "syntax": "temperature [<name>] [<mask>] [out <file>] [frame]"},
+    "average":            {"category": "Analysis",     "title": "Average Structure (average)",            "description": "Compute average structure over trajectory frames.", "syntax": "average [SETNAME] <filename> [<fmt>] [<mask>] [start <s>] [stop <e>] [offset <o>]"},
+    "avgcoord":           {"category": "Analysis",     "title": "Average Coordinates (avgcoord)",         "description": "Average coordinates for each atom over trajectory.", "syntax": "avgcoord [SETNAME] [<mask>] [out <file>]"},
+    "avgbox":             {"category": "Analysis",     "title": "Average Box (avgbox)",                   "description": "Compute average box dimensions over trajectory.", "syntax": "avgbox [SETNAME] [out <file>]"},
+    "bounds":             {"category": "Analysis",     "title": "Bounding Box (bounds)",                  "description": "Calculate bounding box around atoms.", "syntax": "bounds [SETNAME] [<mask>] [out <file>] [dx <dx>] [offset <offset>]"},
+    "principal":          {"category": "Analysis",     "title": "Principal Axes (principal)",             "description": "Calculate principal axes and moments of inertia.", "syntax": "principal [SETNAME] [<mask>] [out <file>] [dorotation] [mass]"},
+    "dipole":             {"category": "Analysis",     "title": "Dipole Moment (dipole)",                 "description": "Calculate dipole moment of selection.", "syntax": "dipole [SETNAME] [<mask>] [out <file>] [<grid_options>]"},
+    "volume":             {"category": "Analysis",     "title": "Unit Cell Volume (volume)",              "description": "Calculate unit cell volume over trajectory.", "syntax": "volume [SETNAME] [out <file>]"},
+    "temperature":        {"category": "Analysis",     "title": "Temperature (temperature)",              "description": "Calculate instantaneous temperature from velocities.", "syntax": "temperature [SETNAME] [<mask>] [out <file>] [frame]"},
     "energy":             {"category": "Analysis",     "title": "Energy (energy)",                        "description": "Calculate energy using internal force field (bond, angle, dihedral, VdW, electrostatic).", "syntax": "energy [<mask>] [out <file>] [bond] [angle] [dih] [vdw] [elec]"},
     "esander":            {"category": "Analysis",     "title": "Energy via Sander (esander)",            "description": "Calculate energy using sander AMBER engine.", "syntax": "esander [<mask>] [out <file>] [igb <igb>] [cut <cut>]"},
     "enedecomp":          {"category": "Analysis",     "title": "Energy Decomposition (enedecomp)",       "description": "Energy decomposition per residue.", "syntax": "enedecomp [<mask>] [out <file>] [cut <cut>]"},
@@ -157,21 +157,21 @@ CPPTRAJ_COMMANDS = {
     "lie":                {"category": "Analysis",     "title": "Linear Interaction Energy (lie)",        "description": "Linear interaction energy calculation.", "syntax": "lie <mask1> [<mask2>] [out <file>] [elec <scale>] [vdw <scale>]"},
     "ti":                 {"category": "Analysis",     "title": "Thermodynamic Integration (ti)",         "description": "Thermodynamic integration (TI) free energy calculation.", "syntax": "ti <dset0> [<dset1>...] {nq <n>|xvals <x>} [out <file>] [name <name>]"},
     "spam":               {"category": "Analysis",     "title": "SPAM (spam)",                            "description": "Solvation parameters from analysis of MD.", "syntax": "spam <site_file> [out <file>] [name <name>] [DG <dg>]"},
-    "nastruct":           {"category": "Analysis",     "title": "Nucleic Acid Structure (nastruct)",      "description": "Nucleic acid structure parameters: base pairs, helical parameters.", "syntax": "nastruct [<name>] [resrange <range>] [naout <suffix>] [sscalc] [noheader]"},
+    "nastruct":           {"category": "Analysis",     "title": "Nucleic Acid Structure (nastruct)",      "description": "Nucleic acid structure parameters: base pairs, helical parameters.", "syntax": "nastruct [SETNAME] [resrange <range>] [naout <suffix>] [sscalc] [noheader]"},
     "jcoupling":          {"category": "Analysis",     "title": "J-coupling (jcoupling)",                 "description": "Calculate J-coupling constants from dihedral angles using Karplus equation.", "syntax": "jcoupling [<mask>] [kfile <karplus_file>] [out <file>]"},
     "ired":               {"category": "Analysis",     "title": "iRED NMR (ired)",                        "description": "iRED analysis of NMR order parameters.", "syntax": "ired [relax freq <MHz>] [order <o>] [orderparamfile <f>] [tstep <t>] [tcorr <t>] [out <f>]"},
     "rotdif":             {"category": "Analysis",     "title": "Rotational Diffusion (rotdif)",          "description": "Rotational diffusion analysis from NMR relaxation.", "syntax": "rotdif [out <file>] [rvecin <file>] [rseed <seed>] [nvecs <N>]"},
     "timecorr":           {"category": "Analysis",     "title": "Time Correlation (timecorr)",            "description": "Time correlation function of vectors.", "syntax": "timecorr vec1 <set> [vec2 <set>] [out <file>] [tstep <t>] [tcorr <t>]"},
-    "vector":             {"category": "Analysis",     "title": "Vector (vector)",                        "description": "Calculate a vector between two masks over time.", "syntax": "vector [<name>] <mask1> <mask2> [out <file>] [ired]"},
+    "vector":             {"category": "Analysis",     "title": "Vector (vector)",                        "description": "Calculate a vector between two masks over time.", "syntax": "vector [SETNAME] <mask1> <mask2> [out <file>] [ired]"},
     "multivector":        {"category": "Analysis",     "title": "Multi-vector (multivector)",             "description": "Calculate vectors for multiple residue pairs.", "syntax": "multivector [<mask>] [out <file>] [ired]"},
     "vectormath":         {"category": "Analysis",     "title": "Vector Math (vectormath)",               "description": "Math operations on vector data sets: dot product, cross product, etc.", "syntax": "vectormath vec1 <set> [vec2 <set>] {dotproduct|crossproduct|...} [out <file>]"},
     "velocityautocorr":   {"category": "Analysis",     "title": "Velocity Autocorrelation (velocityautocorr)", "description": "Velocity autocorrelation function (VACF).", "syntax": "velocityautocorr [<mask>] [out <file>] [tstep <t>] [maxlag <m>] [norm]"},
     "lipidorder":         {"category": "Analysis",     "title": "Lipid Order Parameters (lipidorder)",    "description": "Calculate lipid tail order parameters (Scd) for membrane systems.", "syntax": "lipidorder [<mask>] [out <file>] [scd] [unsat]"},
     "lipidscd":           {"category": "Analysis",     "title": "Lipid Scd (lipidscd)",                   "description": "Lipid Scd order parameter calculation.", "syntax": "lipidscd [<mask>] [out <file>]"},
-    "areapermol":         {"category": "Analysis",     "title": "Area per Molecule (areapermol)",         "description": "Calculate area per molecule for lipid bilayers.", "syntax": "areapermol [<name>] [out <file>] [<mask>] [frame]"},
-    "mindist":            {"category": "Analysis",     "title": "Min/Max Distance (mindist)",             "description": "Minimum and maximum distance between two masks.", "syntax": "mindist [<name>] <mask1> <mask2> [out <file>] [noimage]"},
-    "pairdist":           {"category": "Analysis",     "title": "Pairwise Distance (pairdist)",           "description": "Pairwise distance histogram between all atom pairs.", "syntax": "pairdist [<name>] [<mask>] [out <file>] [delta <dx>] [max <max>]"},
-    "hausdorff":          {"category": "Analysis",     "title": "Hausdorff Distance (hausdorff)",         "description": "Calculate Hausdorff distance between two masks.", "syntax": "hausdorff [<name>] <mask1> <mask2> [out <file>]"},
+    "areapermol":         {"category": "Analysis",     "title": "Area per Molecule (areapermol)",         "description": "Calculate area per molecule for lipid bilayers.", "syntax": "areapermol [SETNAME] [out <file>] [<mask>] [frame]"},
+    "mindist":            {"category": "Analysis",     "title": "Min/Max Distance (mindist)",             "description": "Minimum and maximum distance between two masks.", "syntax": "mindist [SETNAME] <mask1> <mask2> [out <file>] [noimage]"},
+    "pairdist":           {"category": "Analysis",     "title": "Pairwise Distance (pairdist)",           "description": "Pairwise distance histogram between all atom pairs.", "syntax": "pairdist [SETNAME] [<mask>] [out <file>] [delta <dx>] [max <max>]"},
+    "hausdorff":          {"category": "Analysis",     "title": "Hausdorff Distance (hausdorff)",         "description": "Calculate Hausdorff distance between two masks.", "syntax": "hausdorff [SETNAME] <mask1> <mask2> [out <file>]"},
     "tordiff":            {"category": "Analysis",     "title": "Torsion Difference (tordiff)",           "description": "Torsion angle difference between two structures.", "syntax": "tordiff [<mask>] [out <file>] [ref <ref>]"},
     "autocorr":           {"category": "Analysis",     "title": "Autocorrelation (autocorr)",             "description": "Autocorrelation function of a data set.", "syntax": "autocorr <dataset> [out <file>] [lagmax <max>] [norm] [direct]"},
     "crosscorr":          {"category": "Analysis",     "title": "Cross-correlation (crosscorr)",          "description": "Cross-correlation between two data sets.", "syntax": "crosscorr <set1> <set2> [out <file>] [lagmax <max>] [norm] [direct]"},
@@ -421,18 +421,38 @@ class CPPTrajKnowledgeBase:
             for i in top_idx if scores[i] > 0.0
         ]
 
-    def get_context_for_llm(self, query: str, top_k: int = 6) -> str:
+    def get_command_cheatsheet(self) -> str:
+        """Compact one-liner per command — injected once into the system prompt."""
+        cats: dict[str, list[str]] = {}
+        for key, v in CPPTRAJ_COMMANDS.items():
+            cat = v["category"]
+            cats.setdefault(cat, [])
+            cats[cat].append(f"  {key:<20s}  {v['syntax']}")
+        lines = [
+            "## cpptraj Command Reference",
+            "Syntax legend: [SETNAME] = positional output dataset name (first arg, no keyword); [<arg>] = optional named argument.\n",
+        ]
+        for cat in ("Setup", "Manipulation", "Analysis", "Output"):
+            if cat not in cats:
+                continue
+            lines.append(f"# {cat}")
+            lines.extend(cats[cat])
+        return "\n".join(lines)
+
+    def get_context_for_llm(self, query: str, top_k: int = 3,
+                            score_threshold: float = 0.10) -> str:
         """
-        Return a formatted block of the most relevant manual sections
-        to inject as context into Claude's prompt.
+        Return full manual chunks only when TF-IDF relevance > threshold.
+        Returns empty string if nothing is relevant enough (model uses cheatsheet).
         """
         results = self.retrieve(query, top_k=top_k)
+        results = [r for r in results if r["score"] >= score_threshold]
         if not results:
-            return "No relevant documentation found."
+            return ""
 
         lines = [
             "=== CPPTRAJ MANUAL — RELEVANT SECTIONS ===",
-            f"(Extracted from CpptrajManual.pdf, {len(self._chunks)} total sections indexed)\n",
+            "(Use the EXACT command name from each section header, e.g. '11.65 radgyr' → use `radgyr`)\n",
         ]
         for r in results:
             c = r["chunk"]
@@ -440,7 +460,6 @@ class CPPTrajKnowledgeBase:
             lines.append(f"--- {c['header']}  [{pg}  relevance:{r['score']:.2f}] ---")
             lines.append(c["text"])
             lines.append("")
-
         return "\n".join(lines)
 
     def get_all_commands(self)    -> dict: return CPPTRAJ_COMMANDS

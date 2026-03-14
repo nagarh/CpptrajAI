@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>CpptrajGPT — Molecular Dynamics Analysis Studio</title>
+<title>CpptrajAI — Molecular Dynamics Analysis Studio</title>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/3Dmol/2.1.0/3Dmol-min.js"></script>
 <style>
@@ -701,13 +701,26 @@
       <option value="claude">Anthropic Claude</option>
       <option value="openai">OpenAI (GPT)</option>
       <option value="gemini">Google Gemini</option>
+      <option value="ollama">Ollama (local)</option>
     </select>
 
     <label>Model</label>
     <select id="modelSelect" class="viewer-select" style="width:100%;margin-bottom:12px;padding:6px 10px;font-size:12px"></select>
 
-    <label id="apiKeyLabel">API Key</label>
-    <input type="password" id="apiKeyInput" placeholder="Enter API key…" style="margin-bottom:12px">
+    <div id="ollamaModelRow" style="display:none;margin-bottom:12px">
+      <label>Model name (as pulled in Ollama)</label>
+      <input type="text" id="ollamaModelInput" placeholder="e.g. deepseek-v3, llama3.1, qwen2.5-coder:7b" style="margin-bottom:0">
+    </div>
+
+    <div id="ollamaUrlRow" style="display:none;margin-bottom:12px">
+      <label>Ollama base URL</label>
+      <input type="text" id="ollamaUrlInput" placeholder="http://localhost:11434/v1" value="http://localhost:11434/v1" style="margin-bottom:0">
+    </div>
+
+    <div id="apiKeyRow">
+      <label id="apiKeyLabel">API Key</label>
+      <input type="password" id="apiKeyInput" placeholder="Enter API key…" style="margin-bottom:12px">
+    </div>
 
     <div class="modal-note" id="providerHint" style="background:rgba(88,166,255,0.07);border:1px solid var(--border);border-radius:6px;padding:8px 10px;margin-bottom:12px"></div>
 
@@ -827,7 +840,7 @@
           <span id="termStatus" style="color:var(--accent2)">●  IDLE</span>
         </div>
         <div class="terminal-body" id="termBody">
-          <span class="t-line t-info">CpptrajGPT — Molecular Dynamics Analysis Studio</span>
+          <span class="t-line t-info">CpptrajAI — Molecular Dynamics Analysis Studio</span>
           <span class="t-line t-info">Upload topology + trajectory files, write your script, click ▶ Run.</span>
           <span class="t-line t-info">Use ⚙ in the header to set your Anthropic API key for the AI Agent.</span>
           <span class="t-line t-info">─────────────────────────────────────────────────────────</span>
@@ -958,11 +971,11 @@ import matplotlib.pyplot as plt
       </div>
       <div style="padding:8px 10px;border-bottom:1px solid var(--border)">
         <div style="font-size:11px;color:var(--text-muted);margin-bottom:8px;line-height:1.5">
-          Solvated protein · 3216 atoms · 203 res · 2 frames · Multi-MODEL PDB
+          Solvated protein · 30070 atoms · 9157 res · 10 frames · AMBER NetCDF
         </div>
         <div style="display:flex;gap:6px;flex-wrap:wrap">
-          <button class="btn btn-ghost" style="font-size:10px;padding:4px 10px" onclick="loadTestTopology()">⬇ Topology (.prmtop)</button>
-          <button class="btn btn-ghost" style="font-size:10px;padding:4px 10px" onclick="loadTestTrajectory()">⬇ Trajectory (.pdb)</button>
+          <button class="btn btn-ghost" style="font-size:10px;padding:4px 10px" onclick="loadTestTopology()">⬆ Topology (.prmtop)</button>
+          <button class="btn btn-ghost" style="font-size:10px;padding:4px 10px" onclick="loadTestTrajectory()">⬆ Trajectory (.nc)</button>
           <button class="btn btn-primary" style="font-size:10px;padding:4px 10px;margin-top:4px;width:100%" onclick="loadTestScript()">⊕ Load example script</button>
         </div>
       </div>
@@ -2108,6 +2121,7 @@ const PROVIDER_INFO = {
   openai: {
     hint: 'Get your key at platform.openai.com',
     models: [
+      { id:'gpt-4o',      label:'GPT-4o' },
       { id:'gpt-4o-mini', label:'GPT-4o Mini' },
     ],
   },
@@ -2116,6 +2130,10 @@ const PROVIDER_INFO = {
     models: [
       { id:'gemini-2.5-flash', label:'Gemini 2.5 Flash' },
     ],
+  },
+  ollama: {
+    hint: 'Make sure Ollama is running: ollama serve — then pull your model: ollama pull deepseek-v3',
+    models: [],
   },
 };
 
@@ -2131,7 +2149,16 @@ function closeSettings() {
 async function onProviderChange() {
   const p    = document.getElementById('providerSelect').value;
   const info = PROVIDER_INFO[p] || PROVIDER_INFO.claude;
-  const sel  = document.getElementById('modelSelect');
+  const isOllama = p === 'ollama';
+
+  // Show/hide Ollama-specific fields
+  document.getElementById('ollamaModelRow').style.display = isOllama ? 'block' : 'none';
+  document.getElementById('ollamaUrlRow').style.display   = isOllama ? 'block' : 'none';
+  document.getElementById('apiKeyRow').style.display      = isOllama ? 'none'  : 'block';
+  document.getElementById('modelSelect').style.display    = isOllama ? 'none'  : 'block';
+  document.querySelector('label[for="modelSelect"], label:has(+ #modelSelect)');
+
+  const sel = document.getElementById('modelSelect');
   sel.innerHTML = info.models.map(m =>
     `<option value="${m.id}">${m.label}</option>`
   ).join('');
@@ -2140,9 +2167,14 @@ async function onProviderChange() {
 
 async function saveSettings() {
   const provider  = document.getElementById('providerSelect').value;
-  const api_key   = document.getElementById('apiKeyInput').value.trim();
-  const model     = document.getElementById('modelSelect').value;
-  const base_url  = '';
+  const isOllama  = provider === 'ollama';
+  const api_key   = isOllama ? '' : document.getElementById('apiKeyInput').value.trim();
+  const model     = isOllama
+    ? (document.getElementById('ollamaModelInput').value.trim() || 'deepseek-v3')
+    : document.getElementById('modelSelect').value;
+  const base_url  = isOllama
+    ? (document.getElementById('ollamaUrlInput').value.trim() || 'http://localhost:11434/v1')
+    : '';
   try {
     const r = await fetch('/api/set_provider', {
       method: 'POST',
@@ -2313,13 +2345,13 @@ async function loadTestFile(filename) {
 }
 
 function loadTestTopology()   { loadTestFile('protein.prmtop'); }
-function loadTestTrajectory() { loadTestFile('test_traj.pdb'); }
+function loadTestTrajectory() { loadTestFile('mdin_prod.nc'); }
 
 function loadTestScript() {
   document.getElementById('editor').value = `# Example analysis — solvated protein (water-stripped PDB)
 # Load test files from the Files panel first, then click ▶ Run
 parm  protein.prmtop
-trajin test_traj.pdb
+trajin mdin_prod.nc
 
 # Strip solvent and image trajectory
 strip :WAT,Na+,Cl-

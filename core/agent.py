@@ -14,6 +14,21 @@ from .runner import CPPTrajRunner
 
 TOOLS = [
     {
+        "name": "search_cpptraj_docs",
+        "description": (
+            "Search the cpptraj manual for exact command names, syntax, and options. "
+            "ALWAYS call this before writing any cpptraj script to get the correct command name. "
+            "Returns the most relevant manual sections with exact syntax."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "query": {"type": "string", "description": "What to search for, e.g. 'radius of gyration', 'rmsd backbone', 'hydrogen bonds'"},
+            },
+            "required": ["query"],
+        },
+    },
+    {
         "name": "run_cpptraj_script",
         "description": (
             "Write and execute a cpptraj script to analyze the trajectory. "
@@ -67,18 +82,26 @@ TOOLS = [
 SYSTEM_PROMPT = """\
 You are an expert computational biophysicist specializing in MD simulation analysis.
 
-RULES: Always call tools directly. Never explain commands or tell users to run them manually.
-- Be concise. After running any script (cpptraj or Python), give a 1-2 sentence summary of results only. Do not explain what commands do unless explicitly asked. Never repeat the script back to the user.
+## EXECUTION RULES — NEVER VIOLATE
+- NEVER write a script as text in your response. ALWAYS execute it immediately via run_cpptraj_script or run_python_script.
+- NEVER describe what you are going to do. Just do it. No preamble, no step lists, no "Step 1 / Step 2".
+- NEVER show the user a script and ask them to run it. You run it.
+- If a previous script failed, fix it and call the tool again immediately. Do not explain the fix — just run it.
+- After running any script: 1-2 sentence summary of results only. No code, no explanations.
 - cpptraj task → run_cpptraj_script | plotting/stats → run_python_script | list files → list_output_files
-- After cpptraj finishes: read the output file, report the key numbers in 1-2 sentences, then STOP. Never continue to Python automatically.
-- run_python_script is ONLY allowed when the user message contains words like: plot, graph, chart, visualize, histogram, heatmap, statistics, stats, analyze further. "calculate", "compute", "find", "show me" do NOT trigger Python.
-- WRONG: user says "calculate RMSD" → you run cpptraj then auto-run Python to plot it. STOP after cpptraj.
-- RIGHT: user says "calculate RMSD" → run cpptraj, read output, report numbers. Done.
+- After cpptraj finishes: read output, report key numbers, then STOP. Never auto-run Python after cpptraj.
+- run_python_script is ONLY for: plot, graph, chart, visualize, histogram, heatmap, statistics, stats, analyze further.
 
 cpptraj syntax (spaces, NOT colons): `parm file.prmtop` not `parm: file.prmtop`. Always end with `go`.
 - Frame count: parm + trajin + go (stdout shows count).
 - ALWAYS strip :WAT before autoimage and before any RMSD/distance/secstruct analysis. Order: strip → autoimage → analysis. Without stripping water first, autoimage anchors to water molecules causing artificially huge RMSD (20-40 Å).
 - Output: `out rmsd.dat`. References: `first`, `refindex -1`. Masks: `@CA,C,N,O` `@CA` `:1-100` `!:WAT`
+
+## CRITICAL — cpptraj command names
+ALWAYS call search_cpptraj_docs BEFORE writing any cpptraj script — even for common analyses like rmsd or radgyr.
+Use ONLY the exact command name returned by the search (e.g. search returns "radgyr" → use `radgyr`, not `radiusgyration`).
+For analyses requiring multiple commands (e.g. PCA needs matrix + diagmatrix + projection), call search_cpptraj_docs multiple times until you have all the syntax you need.
+After search_cpptraj_docs returns results, IMMEDIATELY call run_cpptraj_script — never stop to explain or summarize the search results.
 
 ## Python Environment
 Available packages: pandas, numpy, matplotlib, scikit-learn, scipy. NOT available: MDAnalysis, parmed, pytraj, openmm.
@@ -127,10 +150,21 @@ class TrajectoryAgent:
         # api_key intentionally not read from environment — must come from IDE settings
 
         self._backend: LLMBackend = create_backend(provider, api_key, model, base_url)
+        self._system_prompt = self._build_system_prompt(provider, model)
 
     def reconfigure(self, provider: str, api_key: str, model: str, base_url: str = ""):
         self._backend = create_backend(provider, api_key, model, base_url)
         self.conversation_history = []
+        self._system_prompt = self._build_system_prompt(provider, model)
+
+    @staticmethod
+    def _build_system_prompt(provider: str, model: str) -> str:
+        prompt = SYSTEM_PROMPT
+        # qwen3 models think by default — prepend /no_think to skip reasoning chain
+        # and save tokens (thinking tokens count toward max_tokens)
+        if provider == "ollama" and "qwen3" in model.lower():
+            prompt = "/no_think\n" + prompt
+        return prompt
 
     _PROTEIN_RES = {
         "ALA","ARG","ASN","ASP","CYS","CYX","GLN","GLU","GLY",
@@ -162,11 +196,13 @@ class TrajectoryAgent:
         res = self.runner.run_script(script)
         stdout = res.get("stdout", "")
         ligands, n_protein, n_water, n_ions = [], 0, 0, 0
+        n_atoms_total = 0
         for line in stdout.splitlines():
             m = re.match(r'\s*(\d+)\s+(\S+)\s+\d+\s+\d+\s+(\d+)\s+', line)
             if not m:
                 continue
             resid, resname, natoms = int(m.group(1)), m.group(2), int(m.group(3))
+            n_atoms_total += natoms
             rname_up = resname.upper()
             if rname_up in {r.upper() for r in self._WATER_RES}:
                 n_water += 1
@@ -176,11 +212,14 @@ class TrajectoryAgent:
                 n_protein += 1
             else:
                 ligands.append({"resid": resid, "name": resname, "natoms": natoms})
+        n_residues_total = n_protein + n_water + n_ions + len(ligands)
         self._topology_info = {
-            "n_protein_res": n_protein,
-            "n_water":       n_water,
-            "n_ions":        n_ions,
-            "ligands":       ligands,
+            "n_atoms_total":   n_atoms_total,
+            "n_residues_total": n_residues_total,
+            "n_protein_res":   n_protein,
+            "n_water":         n_water,
+            "n_ions":          n_ions,
+            "ligands":         ligands,
         }
 
     def reset_conversation(self):
@@ -191,10 +230,6 @@ class TrajectoryAgent:
 
     @property
     def model(self): return self._backend.model
-
-    # Queries that don't need cpptraj documentation context
-    _SKIP_RAG = ("how many frames", "frame count", "list file", "list output",
-                 "plot ", "show plot", "what files", "delete", "reset")
 
     # Aliases: user terms → cpptraj command names
     _CMD_ALIASES = {
@@ -213,23 +248,7 @@ class TrajectoryAgent:
 
     def _build_user_message_with_rag(self, query: str) -> str:
         fc = self._build_file_context()
-        q  = query.lower()
-        if any(kw in q for kw in self._SKIP_RAG):
-            return f"{fc}\n\n## User Request\n{query}"
-
-        # Inject exact syntax for any recognised command aliases
-        exact_lines = []
-        for alias, cmd_key in self._CMD_ALIASES.items():
-            if alias in q:
-                cmd = self.kb.get_command(cmd_key)
-                if cmd:
-                    exact_lines.append(f"  {cmd['title']}: {cmd['syntax']}")
-        exact_block = ""
-        if exact_lines:
-            exact_block = "## Relevant cpptraj syntax\n" + "\n".join(exact_lines) + "\n\n"
-
-        rag = self.kb.get_context_for_llm(query, top_k=3)
-        return f"{fc}\n\n{exact_block}{rag}\n\n## User Request\n{query}"
+        return f"{fc}\n\n## User Request\n{query}"
 
     def _trim_history(self, history: list) -> list:
         """Keep the last few turns, always cutting at a real user-text boundary.
@@ -294,17 +313,24 @@ class TrajectoryAgent:
         return history[-4:]  # fallback: last 4 messages
 
     def _build_file_context(self) -> str:
-        parts = ["## Available Files"]
-        parts.append(f"- Topology: `{self.parm_file.name}`" if self.parm_file
-                     else "- Topology: *not uploaded yet*")
+        parts = ["## Available Files (use EXACTLY these names in every cpptraj script)"]
+        if self.parm_file:
+            parts.append(f"- TOPOLOGY  → `parm {self.parm_file.name}`   ← use with parm command")
+        else:
+            parts.append("- Topology: *not uploaded yet*")
         if self.traj_files:
-            for tf in self.traj_files: parts.append(f"- Trajectory: `{tf.name}`")
+            for tf in self.traj_files:
+                parts.append(f"- TRAJECTORY → `trajin {tf.name}`   ← use with trajin command")
         else:
             parts.append("- Trajectory: *not uploaded yet*")
 
         info = getattr(self, "_topology_info", {})
         if info:
             parts.append(f"\n## Topology Composition")
+            if info.get("n_atoms_total"):
+                parts.append(f"- Total atoms: {info['n_atoms_total']}")
+            if info.get("n_residues_total"):
+                parts.append(f"- Total residues: {info['n_residues_total']}")
             parts.append(f"- Protein residues: {info['n_protein_res']}")
             if info.get('n_ions'):
                 parts.append(f"- Ions: {info['n_ions']} residues")
@@ -325,6 +351,10 @@ class TrajectoryAgent:
         return "\n".join(parts)
 
     def _execute_tool(self, name: str, inp: dict) -> str:
+        if name == "search_cpptraj_docs":
+            query = inp.get("query", "")
+            return self.kb.get_context_for_llm(query, top_k=2, score_threshold=0.0)
+
         if name == "run_cpptraj_script":
             script = inp.get("script", "")
             if not script:
@@ -412,17 +442,23 @@ class TrajectoryAgent:
         })
 
         backend = self._backend
+        max_iterations = 10
+        iteration = 0
 
-        while True:
+        while iteration < max_iterations:
+            iteration += 1
             text_acc = []
             tool_calls = []
             stop_reason = "end_turn"
 
             for event_type, data in backend.stream_chat(
-                    self._safe_trim(self._trim_history(self.conversation_history)), TOOLS, SYSTEM_PROMPT):
+                    self._safe_trim(self._trim_history(self.conversation_history)), TOOLS, self._system_prompt):
                 if event_type == "text":
                     text_acc.append(data)
                     yield {"type": "text", "chunk": data}
+                elif event_type == "retract_text":
+                    text_acc.clear()
+                    yield {"type": "clear_text"}
                 elif event_type == "tool_calls":
                     tool_calls = data
                 elif event_type == "stop_reason":
@@ -430,12 +466,18 @@ class TrajectoryAgent:
 
             full_text = "".join(text_acc)
 
+            # If model output both text AND tool calls, suppress the text —
+            # it's just preamble/explanation before calling the tool.
+            if tool_calls and full_text.strip():
+                full_text = ""
+                yield {"type": "clear_text"}
+
             self.conversation_history.append(
                 backend.make_assistant_message(full_text, tool_calls))
 
             if stop_reason not in ("tool_use", "tool_calls") or not tool_calls:
                 yield {"type": "done"}
-                break
+                return
 
             # Execute tools and stream results
             results = []
@@ -457,6 +499,10 @@ class TrajectoryAgent:
             else:
                 self.conversation_history.append(tool_result_msg)
 
+        # Exceeded max iterations
+        yield {"type": "text", "chunk": "\n\n⚠ Reached maximum tool iterations — stopping."}
+        yield {"type": "done"}
+
     def chat(self, user_query: str) -> tuple[str, list[dict]]:
         self._sanitize_history()
         self.conversation_history.append({
@@ -471,13 +517,13 @@ class TrajectoryAgent:
         while True:
             try:
                 text, tool_calls, has_tool_use = backend.chat(
-                    self._safe_trim(self._trim_history(self.conversation_history)), TOOLS, SYSTEM_PROMPT)
+                    self._safe_trim(self._trim_history(self.conversation_history)), TOOLS, self._system_prompt)
             except Exception as e:
                 if "tool_use" in str(e) or "tool_result" in str(e):
                     last = self.conversation_history[-1]
                     self.conversation_history = [last]
                     text, tool_calls, has_tool_use = backend.chat(
-                        self._safe_trim(self._trim_history(self.conversation_history)), TOOLS, SYSTEM_PROMPT)
+                        self._safe_trim(self._trim_history(self.conversation_history)), TOOLS, self._system_prompt)
                 else:
                     raise
 

@@ -43,6 +43,12 @@ PROVIDER_DEFAULTS = {
         "label": "Google Gemini",
         "models": ["gemini-2.5-flash"],
     },
+    "ollama": {
+        "default_model": "deepseek-v3",
+        "label": "Ollama (local)",
+        "base_url": "http://localhost:11434/v1",
+        "models": ["deepseek-v3"],
+    },
 }
 
 
@@ -164,7 +170,9 @@ class OpenAICompatBackend(LLMBackend):
     def stream_chat(self, messages, tools, system):
         oai_tools = self._oai_tools(tools)
         full_messages = [{"role": "system", "content": system}] + messages
-        kwargs: dict[str, Any] = dict(model=self._model, messages=full_messages, max_tokens=4096, stream=True)
+        kwargs: dict[str, Any] = dict(model=self._model, messages=full_messages, stream=True)
+        if self._provider != "ollama":
+            kwargs["max_tokens"] = 4096
         if oai_tools:
             kwargs["tools"] = oai_tools
         response = self._client.chat.completions.create(**kwargs)
@@ -192,13 +200,23 @@ class OpenAICompatBackend(LLMBackend):
             except Exception: inp = {}
             tool_calls.append({"id": tc["id"], "name": tc["name"], "input": inp})
 
+        # Fallback: model printed tool calls as text instead of using native calling
+        if not tool_calls and text_chunks:
+            full_text = "".join(text_chunks)
+            tool_calls = _extract_text_tool_calls(full_text)
+            if tool_calls:
+                # Signal that the streamed text was actually a tool call, not display text
+                yield ("retract_text", None)
+
         yield ("tool_calls", tool_calls)
-        yield ("stop_reason", "tool_calls" if finish_reason == "tool_calls" else "end_turn")
+        yield ("stop_reason", "tool_calls" if (finish_reason == "tool_calls" or tool_calls) else "end_turn")
 
     def chat(self, messages, tools, system):
         oai_tools = self._oai_tools(tools)
         full_messages = [{"role": "system", "content": system}] + messages
-        kwargs: dict[str, Any] = dict(model=self._model, messages=full_messages, max_tokens=4096)
+        kwargs: dict[str, Any] = dict(model=self._model, messages=full_messages)
+        if self._provider != "ollama":
+            kwargs["max_tokens"] = 4096
         if oai_tools:
             kwargs["tools"] = oai_tools
         response = self._client.chat.completions.create(**kwargs)
@@ -465,4 +483,7 @@ def create_backend(provider: str, api_key: str = "", model: str = "", base_url: 
         return OpenAIResponsesBackend(api_key=api_key, model=model)
     if provider == "gemini":
         return GeminiNativeBackend(api_key=api_key, model=model)
+    if provider == "ollama":
+        resolved_url = base_url or PROVIDER_DEFAULTS["ollama"]["base_url"]
+        return OpenAICompatBackend(api_key="ollama", model=model, base_url=resolved_url, provider_name="ollama")
     return OpenAICompatBackend(api_key=api_key, model=model, base_url=base_url, provider_name=provider)

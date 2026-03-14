@@ -151,13 +151,27 @@ def upload():
         sd["parm_file"] = saved
         kind = "topology"
     elif ext == ".pdb":
-        # Multi-MODEL PDB → trajectory; single-model PDB → topology
-        try:
-            head = saved.read_bytes(65536).decode("utf-8", errors="ignore")
-            model_count = head.count("\nMODEL ")
-        except Exception:
-            model_count = 0
-        if model_count > 1:
+        # If a proper topology (.prmtop/.parm7/.psf/.gro) is already loaded,
+        # always treat PDB as trajectory (avoids mis-classification)
+        proper_topo_exts = {".prmtop", ".parm7", ".psf", ".gro", ".mol2"}
+        already_has_topo = (
+            sd["parm_file"] is not None and
+            sd["parm_file"].suffix.lower() in proper_topo_exts
+        )
+        if already_has_topo:
+            is_traj = True
+        else:
+            # Read up to 2 MB to detect multi-MODEL PDB
+            try:
+                file_bytes = saved.read_bytes(2 * 1024 * 1024)
+                head = file_bytes.decode("utf-8", errors="ignore")
+                model_count = head.count("\nMODEL ")
+                if len(file_bytes) == 2 * 1024 * 1024:
+                    model_count = max(model_count, 2)
+            except Exception:
+                model_count = 0
+            is_traj = model_count > 1
+        if is_traj:
             if saved not in sd["traj_files"]:
                 sd["traj_files"].append(saved)
             kind = "trajectory"
