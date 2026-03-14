@@ -150,7 +150,7 @@ In CpptrajAI Settings:
 4. Choose a model
 5. Click **Save**
 
-> **Privacy:** API keys are stored only in your browser session and are never written to disk or logged.
+> **Privacy:** API keys are never written to disk or logged. They are held in server memory only for the duration of your session and cleared automatically after 2 hours of inactivity. Use a key with a spending limit when running on shared infrastructure.
 
 ---
 
