@@ -104,15 +104,26 @@ def get_sd() -> dict:
     if len(_SESSIONS) > 50:
         _cleanup_expired_sessions()
 
-    sid = request.headers.get("X-Session-Id") or session.get("sid")
-    if not sid or sid not in _SESSIONS:
-        sid = str(uuid.uuid4())
-        session["sid"] = sid
+    header_sid = request.headers.get("X-Session-Id")
+    if header_sid:
+        # Use the client-provided ID as-is — create session if new
+        sid = header_sid
         with _SESSIONS_LOCK:
-            _SESSIONS[sid] = _make_session_state()
+            if sid not in _SESSIONS:
+                _SESSIONS[sid] = _make_session_state()
+            else:
+                _SESSIONS[sid]["last_active"] = time.time()
     else:
-        with _SESSIONS_LOCK:
-            _SESSIONS[sid]["last_active"] = time.time()
+        # Fallback: Flask cookie session
+        sid = session.get("sid")
+        if not sid or sid not in _SESSIONS:
+            sid = str(uuid.uuid4())
+            session["sid"] = sid
+            with _SESSIONS_LOCK:
+                _SESSIONS[sid] = _make_session_state()
+        else:
+            with _SESSIONS_LOCK:
+                _SESSIONS[sid]["last_active"] = time.time()
     return _SESSIONS[sid]
 
 
