@@ -356,26 +356,41 @@ Each browser session gets a unique UUID cookie. All state (uploaded files, agent
 
 ---
 
-## Docker / HuggingFace Spaces
+## Docker
 
-CpptrajAI is deployable as a Docker app on HuggingFace Spaces.
-
-### Build and run locally with Docker
+### Option 1 — Pull from Docker Hub (easiest)
 
 ```bash
-docker build -t cpptraj-ai .
-docker run -p 7860:7860 cpptraj-ai
+docker pull nagarh/cpptraj-ai:latest
+docker run -p 8502:8502 nagarh/cpptraj-ai:latest
 ```
 
-Open **http://localhost:7860**
+Open **http://localhost:8502**
+
+### Option 2 — Docker Compose
+
+```bash
+docker compose up
+```
+
+Open **http://localhost:8502**
+
+### Option 3 — Build from source
+
+```bash
+git clone https://github.com/nagarh/CpptrajAI.git
+cd CpptrajAI
+docker build -t cpptraj-ai .
+docker run -p 8502:8502 cpptraj-ai
+```
 
 ### Environment variables
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `CPPTRAJ_PATH` | `cpptraj` | Path to cpptraj binary |
-| `PORT` | `8502` | Server port (7860 for HuggingFace) |
-| `FLASK_SECRET_KEY` | auto-generated | Flask session secret |
+| `CPPTRAJ_PATH` | bundled via ambertools | Path to cpptraj binary |
+| `PORT` | `8502` | Server port |
+| `FLASK_SECRET_KEY` | default | Change in production |
 
 ---
 

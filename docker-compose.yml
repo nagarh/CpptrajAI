@@ -1,0 +1,10 @@
+services:
+  cpptraj-ai:
+    image: nagarh/cpptraj-ai:latest
+    ports:
+      - "8502:8502"
+    environment:
+      - PORT=8502
+      - FLASK_SECRET_KEY=change-me-in-production
+    volumes:
+      - ./outputs:/app/outputs
