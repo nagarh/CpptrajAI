@@ -337,6 +337,58 @@ CpptrajAI/
 └── requirements.txt
 ```
 
+## Agent Execution
+
+This section explains exactly how CpptrajAI processes a user prompt from start to finish.
+
+### Execution flow
+
+```
+User prompt
+     │
+     ▼
+┌─────────────────────────────────────────────┐
+│  System prompt injection                     │
+│  • Topology info (atoms, residues, masks)    │
+│  • Uploaded file names                       │
+│  • Execution rules & workflow guidelines     │
+└─────────────────────────────────────────────┘
+     │
+     ▼
+┌─────────────────────────────────────────────┐
+│  LLM decides next action (tool call or done) │
+└─────────────────────────────────────────────┘
+     │
+     ├──► search_cpptraj_docs ──► TF-IDF search over CpptrajManual.pdf
+     │                             Returns top-2 relevant chunks
+     │                             (cloud models: on-demand only)
+     │                             (Ollama: before every script)
+     │
+     ├──► run_cpptraj_script ───► Writes script to disk
+     │                             Runs cpptraj subprocess
+     │                             Returns stdout, stderr, output files
+     │
+     ├──► run_python_script ────► Executes Python in session working dir
+     │                             pandas / numpy / matplotlib / scipy
+     │                             Returns stdout + any saved plot files
+     │
+     ├──► read_output_file ─────► Reads a .dat or output file from disk
+     │                             Returns raw content to the model
+     │
+     └──► list_output_files ────► Lists all files in session working dir
+                                   Model uses this to check what exists
+     │
+     ▼
+┌─────────────────────────────────────────────┐
+│  Tool result appended to conversation        │
+│  Loop back → LLM decides next action         │
+│  (max 15 iterations, then auto-stop)         │
+└─────────────────────────────────────────────┘
+     │
+     ▼
+  Final 1-2 sentence summary streamed to user
+```
+
 ### Agent tools
 
 The AI agent has access to the following tools it can call autonomously:
@@ -348,6 +400,21 @@ The AI agent has access to the following tools it can call autonomously:
 | `run_python_script` | Write and execute a Python script for post-processing, plotting, or statistics on cpptraj output files. |
 | `read_output_file` | Read the content of an output file produced by a previous cpptraj run. |
 | `list_output_files` | List all output files currently in the working directory. |
+
+### Multi-step workflow handling
+
+Each `run_cpptraj_script` call is a **fresh cpptraj process** — in-memory datasets do not persist between calls. The agent handles this by:
+
+1. Writing every intermediate result to disk with `out filename`
+2. Reloading data in subsequent scripts using `readdata filename name datasetname`
+3. Passing computed results (e.g. eigenvectors from PCA) to Python for post-processing
+
+**Example — PCA workflow:**
+```
+Step 1 → run_cpptraj_script  : compute covariance matrix → write evecs.dat
+Step 2 → run_cpptraj_script  : readdata evecs.dat → project trajectory → write pca.dat
+Step 3 → run_python_script   : load pca.dat → plot PC1 vs PC2 free energy landscape
+```
 
 ### RAG pipeline
 
