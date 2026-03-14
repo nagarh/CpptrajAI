@@ -209,18 +209,6 @@ Plot radius of gyration of the ligand
 Calculate the dynamic cross-correlation matrix of the Cα atoms and plot it as a heatmap
 ```
 ```
-Cluster the trajectory into 5 clusters using hierarchical clustering
-```
-```
-Perform PCA on the protein backbone and plot the first two principal components colored by time
-```
-```
-Calculate hydrogen bonds between protein and ligand and plot their occupancy
-```
-```
-Calculate RMSD and radius of gyration, then plot a 2D free energy landscape
-```
-```
 Strip water molecules and save a new trajectory
 ```
 
