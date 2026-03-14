@@ -58,7 +58,7 @@
 <text x="120" y="371" text-anchor="middle" font-size="10" font-weight="bold" fill="#f0883e">search_cpptraj_docs</text>
 <line x1="50" y1="378" x2="190" y2="378" stroke="#f0883e" stroke-width="0.8"/>
 <text x="120" y="394" text-anchor="middle" font-size="10" fill="#8b949e">TF-IDF search over</text>
-<text x="120" y="409" text-anchor="middle" font-size="10" fill="#8b949e">CpptrajManual.pdf</text>
+<text x="120" y="409" text-anchor="middle" font-size="10" fill="#8b949e">213 cached manual chunks</text>
 <text x="120" y="424" text-anchor="middle" font-size="10" fill="#8b949e">Returns top-2 chunks</text>
 <text x="120" y="441" text-anchor="middle" font-size="9" fill="#484f58">on-demand / always for Ollama</text>
 
