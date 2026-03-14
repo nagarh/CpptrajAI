@@ -1,165 +1,160 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 1020" font-family="Segoe UI, Arial, sans-serif">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 860" font-family="Segoe UI, Arial, sans-serif">
+<defs>
+  <marker id="arr" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+    <polygon points="0 0, 10 3.5, 0 7" fill="#8b949e"/>
+  </marker>
+  <marker id="arr-green" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+    <polygon points="0 0, 10 3.5, 0 7" fill="#3fb950"/>
+  </marker>
+  <marker id="arr-yellow" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+    <polygon points="0 0, 10 3.5, 0 7" fill="#e3b341"/>
+  </marker>
+</defs>
 
-  <!-- Background -->
-  <rect width="900" height="1020" fill="#0d1117" rx="12"/>
+<!-- Background -->
+<rect width="900" height="860" fill="#0d1117" rx="12"/>
 
-  <!-- Title -->
-  <text x="450" y="38" text-anchor="middle" font-size="18" font-weight="bold" fill="#e6edf3">CpptrajAI — Agent Execution Flow</text>
+<!-- Title -->
+<text x="450" y="30" text-anchor="middle" font-size="16" font-weight="bold" fill="#e6edf3">CpptrajAI — Agent Execution Flow</text>
 
-  <!-- ── User Prompt ── -->
-  <rect x="325" y="60" width="250" height="52" rx="8" fill="#1f6feb" stroke="#388bfd" stroke-width="1.5"/>
-  <text x="450" y="81" text-anchor="middle" font-size="13" font-weight="bold" fill="#ffffff">User Prompt</text>
-  <text x="450" y="100" text-anchor="middle" font-size="11" fill="#cdd9e5">"Calculate RMSD of backbone..."</text>
+<!-- ═══ User Prompt ═══ -->
+<rect x="325" y="45" width="250" height="48" rx="8" fill="#1f6feb" stroke="#388bfd" stroke-width="1.5"/>
+<text x="450" y="65" text-anchor="middle" font-size="13" font-weight="bold" fill="#ffffff">User Prompt</text>
+<text x="450" y="83" text-anchor="middle" font-size="11" fill="#cdd9e5">"Calculate RMSD of backbone..."</text>
 
-  <!-- arrow down -->
-  <line x1="450" y1="112" x2="450" y2="140" stroke="#8b949e" stroke-width="1.5" marker-end="url(#arr)"/>
+<!-- Arrow down -->
+<line x1="450" y1="93" x2="450" y2="120" stroke="#8b949e" stroke-width="1.5" marker-end="url(#arr)"/>
 
-  <!-- ── System Prompt Injection ── -->
-  <rect x="275" y="140" width="350" height="72" rx="8" fill="#161b22" stroke="#30363d" stroke-width="1.5"/>
-  <text x="450" y="162" text-anchor="middle" font-size="13" font-weight="bold" fill="#e6edf3">System Prompt Injection</text>
-  <text x="450" y="180" text-anchor="middle" font-size="11" fill="#8b949e">Topology info • File names</text>
-  <text x="450" y="196" text-anchor="middle" font-size="11" fill="#8b949e">Execution rules • Workflow guidelines</text>
+<!-- ═══ System Prompt Injection ═══ -->
+<rect x="250" y="123" width="400" height="65" rx="8" fill="#161b22" stroke="#30363d" stroke-width="1.5"/>
+<text x="450" y="145" text-anchor="middle" font-size="13" font-weight="bold" fill="#e6edf3">System Prompt Injection</text>
+<line x1="260" y1="153" x2="640" y2="153" stroke="#30363d" stroke-width="0.8"/>
+<text x="450" y="170" text-anchor="middle" font-size="11" fill="#8b949e">Topology info • File names • Execution rules • Workflow guidelines</text>
 
-  <!-- arrow down -->
-  <line x1="450" y1="212" x2="450" y2="240" stroke="#8b949e" stroke-width="1.5" marker-end="url(#arr)"/>
+<!-- Arrow down -->
+<line x1="450" y1="188" x2="450" y2="215" stroke="#8b949e" stroke-width="1.5" marker-end="url(#arr)"/>
 
-  <!-- ── LLM Decision ── -->
-  <rect x="300" y="240" width="300" height="60" rx="8" fill="#21262d" stroke="#388bfd" stroke-width="2"/>
-  <text x="450" y="265" text-anchor="middle" font-size="13" font-weight="bold" fill="#79c0ff">LLM Decision Engine</text>
-  <text x="450" y="286" text-anchor="middle" font-size="11" fill="#8b949e">Decides next tool call or final response</text>
+<!-- ═══ LLM Decision Engine ═══ -->
+<rect x="300" y="218" width="300" height="58" rx="8" fill="#21262d" stroke="#388bfd" stroke-width="2"/>
+<text x="450" y="242" text-anchor="middle" font-size="13" font-weight="bold" fill="#79c0ff">LLM Decision Engine</text>
+<text x="450" y="262" text-anchor="middle" font-size="11" fill="#8b949e">Decides next tool call or final answer</text>
 
-  <!-- ── 5 arrows out from LLM ── -->
-  <!-- to search_cpptraj_docs (far left) -->
-  <line x1="300" y1="270" x2="80" y2="390" stroke="#8b949e" stroke-width="1.5" marker-end="url(#arr)"/>
-  <!-- to run_cpptraj_script (left) -->
-  <line x1="340" y1="300" x2="220" y2="390" stroke="#8b949e" stroke-width="1.5" marker-end="url(#arr)"/>
-  <!-- to run_python_script (center) -->
-  <line x1="450" y1="300" x2="450" y2="390" stroke="#8b949e" stroke-width="1.5" marker-end="url(#arr)"/>
-  <!-- to read_output_file (right) -->
-  <line x1="560" y1="300" x2="680" y2="390" stroke="#8b949e" stroke-width="1.5" marker-end="url(#arr)"/>
-  <!-- to list_output_files (far right) -->
-  <line x1="600" y1="270" x2="820" y2="390" stroke="#8b949e" stroke-width="1.5" marker-end="url(#arr)"/>
+<!-- ─── Fan-out via top bus ─── -->
+<!-- Stem from LLM bottom center to top bus -->
+<line x1="450" y1="276" x2="450" y2="315" stroke="#8b949e" stroke-width="1.5"/>
+<!-- Top bus horizontal: y=315, x=120 to x=780 -->
+<line x1="120" y1="315" x2="780" y2="315" stroke="#8b949e" stroke-width="1.5"/>
+<!-- Drops from bus to each tool top (y=350) -->
+<line x1="120" y1="315" x2="120" y2="347" stroke="#8b949e" stroke-width="1.5" marker-end="url(#arr)"/>
+<line x1="285" y1="315" x2="285" y2="347" stroke="#8b949e" stroke-width="1.5" marker-end="url(#arr)"/>
+<line x1="450" y1="315" x2="450" y2="347" stroke="#8b949e" stroke-width="1.5" marker-end="url(#arr)"/>
+<line x1="615" y1="315" x2="615" y2="347" stroke="#8b949e" stroke-width="1.5" marker-end="url(#arr)"/>
+<line x1="780" y1="315" x2="780" y2="347" stroke="#8b949e" stroke-width="1.5" marker-end="url(#arr)"/>
 
-  <!-- ── Tool boxes ── -->
-  <!-- search_cpptraj_docs -->
-  <rect x="10" y="390" width="150" height="100" rx="8" fill="#161b22" stroke="#f0883e" stroke-width="1.5"/>
-  <text x="85" y="412" text-anchor="middle" font-size="11" font-weight="bold" fill="#f0883e">search_cpptraj_docs</text>
-  <line x1="10" y1="422" x2="160" y2="422" stroke="#f0883e" stroke-width="0.8"/>
-  <text x="85" y="440" text-anchor="middle" font-size="10" fill="#8b949e">TF-IDF search over</text>
-  <text x="85" y="456" text-anchor="middle" font-size="10" fill="#8b949e">CpptrajManual.pdf</text>
-  <text x="85" y="472" text-anchor="middle" font-size="10" fill="#8b949e">Returns top-2 chunks</text>
+<!-- ═══ Tool Boxes (y=350, w=140, h=100) ═══ -->
 
-  <!-- run_cpptraj_script -->
-  <rect x="170" y="390" width="150" height="100" rx="8" fill="#161b22" stroke="#3fb950" stroke-width="1.5"/>
-  <text x="245" y="412" text-anchor="middle" font-size="11" font-weight="bold" fill="#3fb950">run_cpptraj_script</text>
-  <line x1="170" y1="422" x2="320" y2="422" stroke="#3fb950" stroke-width="0.8"/>
-  <text x="245" y="440" text-anchor="middle" font-size="10" fill="#8b949e">Writes &amp; executes</text>
-  <text x="245" y="456" text-anchor="middle" font-size="10" fill="#8b949e">cpptraj subprocess</text>
-  <text x="245" y="472" text-anchor="middle" font-size="10" fill="#8b949e">Returns stdout + files</text>
+<!-- search_cpptraj_docs (center x=120) -->
+<rect x="50" y="350" width="140" height="100" rx="8" fill="#161b22" stroke="#f0883e" stroke-width="1.5"/>
+<text x="120" y="371" text-anchor="middle" font-size="10" font-weight="bold" fill="#f0883e">search_cpptraj_docs</text>
+<line x1="50" y1="378" x2="190" y2="378" stroke="#f0883e" stroke-width="0.8"/>
+<text x="120" y="394" text-anchor="middle" font-size="10" fill="#8b949e">TF-IDF search over</text>
+<text x="120" y="409" text-anchor="middle" font-size="10" fill="#8b949e">CpptrajManual.pdf</text>
+<text x="120" y="424" text-anchor="middle" font-size="10" fill="#8b949e">Returns top-2 chunks</text>
+<text x="120" y="441" text-anchor="middle" font-size="9" fill="#484f58">on-demand / always for Ollama</text>
 
-  <!-- run_python_script -->
-  <rect x="330" y="390" width="150" height="100" rx="8" fill="#161b22" stroke="#58a6ff" stroke-width="1.5"/>
-  <text x="405" y="412" text-anchor="middle" font-size="11" font-weight="bold" fill="#58a6ff">run_python_script</text>
-  <line x1="330" y1="422" x2="480" y2="422" stroke="#58a6ff" stroke-width="0.8"/>
-  <text x="405" y="440" text-anchor="middle" font-size="10" fill="#8b949e">Executes Python</text>
-  <text x="405" y="456" text-anchor="middle" font-size="10" fill="#8b949e">pandas/numpy/scipy</text>
-  <text x="405" y="472" text-anchor="middle" font-size="10" fill="#8b949e">Returns output + plots</text>
+<!-- run_cpptraj_script (center x=285) -->
+<rect x="215" y="350" width="140" height="100" rx="8" fill="#161b22" stroke="#3fb950" stroke-width="1.5"/>
+<text x="285" y="371" text-anchor="middle" font-size="10" font-weight="bold" fill="#3fb950">run_cpptraj_script</text>
+<line x1="215" y1="378" x2="355" y2="378" stroke="#3fb950" stroke-width="0.8"/>
+<text x="285" y="394" text-anchor="middle" font-size="10" fill="#8b949e">Writes &amp; executes</text>
+<text x="285" y="409" text-anchor="middle" font-size="10" fill="#8b949e">cpptraj subprocess</text>
+<text x="285" y="424" text-anchor="middle" font-size="10" fill="#8b949e">stdout + output files</text>
+<text x="285" y="441" text-anchor="middle" font-size="9" fill="#484f58">fresh process each call</text>
 
-  <!-- read_output_file -->
-  <rect x="490" y="390" width="150" height="100" rx="8" fill="#161b22" stroke="#bc8cff" stroke-width="1.5"/>
-  <text x="565" y="412" text-anchor="middle" font-size="11" font-weight="bold" fill="#bc8cff">read_output_file</text>
-  <line x1="490" y1="422" x2="640" y2="422" stroke="#bc8cff" stroke-width="0.8"/>
-  <text x="565" y="440" text-anchor="middle" font-size="10" fill="#8b949e">Reads .dat or any</text>
-  <text x="565" y="456" text-anchor="middle" font-size="10" fill="#8b949e">output file from disk</text>
-  <text x="565" y="472" text-anchor="middle" font-size="10" fill="#8b949e">Returns raw content</text>
+<!-- run_python_script (center x=450) -->
+<rect x="380" y="350" width="140" height="100" rx="8" fill="#161b22" stroke="#58a6ff" stroke-width="1.5"/>
+<text x="450" y="371" text-anchor="middle" font-size="10" font-weight="bold" fill="#58a6ff">run_python_script</text>
+<line x1="380" y1="378" x2="520" y2="378" stroke="#58a6ff" stroke-width="0.8"/>
+<text x="450" y="394" text-anchor="middle" font-size="10" fill="#8b949e">Executes Python</text>
+<text x="450" y="409" text-anchor="middle" font-size="10" fill="#8b949e">pandas / numpy / scipy</text>
+<text x="450" y="424" text-anchor="middle" font-size="10" fill="#8b949e">stdout + plot files</text>
+<text x="450" y="441" text-anchor="middle" font-size="9" fill="#484f58">post-process &amp; plotting</text>
 
-  <!-- list_output_files -->
-  <rect x="650" y="390" width="150" height="100" rx="8" fill="#161b22" stroke="#f85149" stroke-width="1.5"/>
-  <text x="725" y="412" text-anchor="middle" font-size="11" font-weight="bold" fill="#f85149">list_output_files</text>
-  <line x1="650" y1="422" x2="800" y2="422" stroke="#f85149" stroke-width="0.8"/>
-  <text x="725" y="440" text-anchor="middle" font-size="10" fill="#8b949e">Lists all files in</text>
-  <text x="725" y="456" text-anchor="middle" font-size="10" fill="#8b949e">session working dir</text>
-  <text x="725" y="472" text-anchor="middle" font-size="10" fill="#8b949e">Model checks state</text>
+<!-- read_output_file (center x=615) -->
+<rect x="545" y="350" width="140" height="100" rx="8" fill="#161b22" stroke="#bc8cff" stroke-width="1.5"/>
+<text x="615" y="371" text-anchor="middle" font-size="10" font-weight="bold" fill="#bc8cff">read_output_file</text>
+<line x1="545" y1="378" x2="685" y2="378" stroke="#bc8cff" stroke-width="0.8"/>
+<text x="615" y="394" text-anchor="middle" font-size="10" fill="#8b949e">Reads .dat or any</text>
+<text x="615" y="409" text-anchor="middle" font-size="10" fill="#8b949e">output file from disk</text>
+<text x="615" y="424" text-anchor="middle" font-size="10" fill="#8b949e">Returns raw content</text>
+<text x="615" y="441" text-anchor="middle" font-size="9" fill="#484f58">inspect results</text>
 
-  <!-- ── arrows from tools down to Tool Result ── -->
-  <line x1="85"  y1="490" x2="85"  y2="570" stroke="#8b949e" stroke-width="1.5" marker-end="url(#arr)"/>
-  <line x1="245" y1="490" x2="245" y2="570" stroke="#8b949e" stroke-width="1.5" marker-end="url(#arr)"/>
-  <line x1="405" y1="490" x2="405" y2="570" stroke="#8b949e" stroke-width="1.5" marker-end="url(#arr)"/>
-  <line x1="565" y1="490" x2="565" y2="570" stroke="#8b949e" stroke-width="1.5" marker-end="url(#arr)"/>
-  <line x1="725" y1="490" x2="725" y2="570" stroke="#8b949e" stroke-width="1.5" marker-end="url(#arr)"/>
+<!-- list_output_files (center x=780) -->
+<rect x="710" y="350" width="140" height="100" rx="8" fill="#161b22" stroke="#f85149" stroke-width="1.5"/>
+<text x="780" y="371" text-anchor="middle" font-size="10" font-weight="bold" fill="#f85149">list_output_files</text>
+<line x1="710" y1="378" x2="850" y2="378" stroke="#f85149" stroke-width="0.8"/>
+<text x="780" y="394" text-anchor="middle" font-size="10" fill="#8b949e">Lists all files in</text>
+<text x="780" y="409" text-anchor="middle" font-size="10" fill="#8b949e">session working dir</text>
+<text x="780" y="424" text-anchor="middle" font-size="10" fill="#8b949e">Returns file list</text>
+<text x="780" y="441" text-anchor="middle" font-size="9" fill="#484f58">check state</text>
 
-  <!-- ── Tool Result ── -->
-  <rect x="275" y="570" width="350" height="60" rx="8" fill="#161b22" stroke="#30363d" stroke-width="1.5"/>
-  <text x="450" y="596" text-anchor="middle" font-size="13" font-weight="bold" fill="#e6edf3">Tool Result</text>
-  <text x="450" y="616" text-anchor="middle" font-size="11" fill="#8b949e">Appended to conversation history</text>
+<!-- ─── Fan-in via bottom bus ─── -->
+<!-- Stems from tool bottoms (y=450) to bottom bus (y=490) -->
+<line x1="120" y1="450" x2="120" y2="490" stroke="#8b949e" stroke-width="1.5"/>
+<line x1="285" y1="450" x2="285" y2="490" stroke="#8b949e" stroke-width="1.5"/>
+<line x1="450" y1="450" x2="450" y2="490" stroke="#8b949e" stroke-width="1.5"/>
+<line x1="615" y1="450" x2="615" y2="490" stroke="#8b949e" stroke-width="1.5"/>
+<line x1="780" y1="450" x2="780" y2="490" stroke="#8b949e" stroke-width="1.5"/>
+<!-- Bottom bus horizontal: y=490, x=120 to x=780 -->
+<line x1="120" y1="490" x2="780" y2="490" stroke="#8b949e" stroke-width="1.5"/>
+<!-- Single arrow from bus centre down to Tool Result -->
+<line x1="450" y1="490" x2="450" y2="517" stroke="#8b949e" stroke-width="1.5" marker-end="url(#arr)"/>
 
-  <!-- converging lines from tools to Tool Result box -->
-  <line x1="85"  y1="540" x2="275" y2="580" stroke="#30363d" stroke-width="1"/>
-  <line x1="245" y1="540" x2="320" y2="575" stroke="#30363d" stroke-width="1"/>
-  <line x1="565" y1="540" x2="580" y2="575" stroke="#30363d" stroke-width="1"/>
-  <line x1="725" y1="540" x2="625" y2="580" stroke="#30363d" stroke-width="1"/>
+<!-- ═══ Tool Result ═══ -->
+<rect x="300" y="520" width="300" height="52" rx="8" fill="#161b22" stroke="#30363d" stroke-width="1.5"/>
+<text x="450" y="542" text-anchor="middle" font-size="13" font-weight="bold" fill="#e6edf3">Tool Result</text>
+<text x="450" y="560" text-anchor="middle" font-size="11" fill="#8b949e">Appended to conversation history</text>
 
-  <!-- arrow down to iteration check -->
-  <line x1="450" y1="630" x2="450" y2="665" stroke="#8b949e" stroke-width="1.5" marker-end="url(#arr)"/>
+<!-- Arrow down -->
+<line x1="450" y1="572" x2="450" y2="598" stroke="#8b949e" stroke-width="1.5" marker-end="url(#arr)"/>
 
-  <!-- ── Iteration check ── -->
-  <rect x="300" y="665" width="300" height="55" rx="8" fill="#21262d" stroke="#30363d" stroke-width="1.5"/>
-  <text x="450" y="688" text-anchor="middle" font-size="13" font-weight="bold" fill="#e6edf3">Iteration Check</text>
-  <text x="450" y="707" text-anchor="middle" font-size="11" fill="#8b949e">Max 15 tool calls reached?</text>
+<!-- ═══ Iteration Check ═══ -->
+<rect x="300" y="601" width="300" height="55" rx="8" fill="#21262d" stroke="#e3b341" stroke-width="1.5"/>
+<text x="450" y="623" text-anchor="middle" font-size="13" font-weight="bold" fill="#e3b341">Iteration Check</text>
+<text x="450" y="643" text-anchor="middle" font-size="11" fill="#8b949e">Max 15 tool calls reached?</text>
 
-  <!-- NO → loop back to LLM -->
-  <line x1="300" y1="692" x2="220" y2="692" stroke="#3fb950" stroke-width="1.5" marker-end="url(#arr)"/>
-  <line x1="220" y1="692" x2="220" y2="270" stroke="#3fb950" stroke-width="1.5"/>
-  <line x1="220" y1="270" x2="300" y2="270" stroke="#3fb950" stroke-width="1.5" marker-end="url(#arr)"/>
-  <text x="195" y="490" text-anchor="middle" font-size="11" font-weight="bold" fill="#3fb950" transform="rotate(-90 195 490)">No — loop back</text>
+<!-- NO path — loop back to LLM (green L-shape on left) -->
+<line x1="300" y1="628" x2="30"  y2="628" stroke="#3fb950" stroke-width="1.5"/>
+<line x1="30"  y1="628" x2="30"  y2="247" stroke="#3fb950" stroke-width="1.5"/>
+<line x1="30"  y1="247" x2="298" y2="247" stroke="#3fb950" stroke-width="1.5" marker-end="url(#arr-green)"/>
+<text x="16" y="438" text-anchor="middle" font-size="11" font-weight="bold" fill="#3fb950" transform="rotate(-90 16 438)">No — loop back</text>
 
-  <!-- YES → arrow down to final response -->
-  <line x1="450" y1="720" x2="450" y2="760" stroke="#f85149" stroke-width="1.5" marker-end="url(#arr)"/>
-  <text x="465" y="745" font-size="11" fill="#f85149">Yes</text>
+<!-- YES path — down to Final Response (yellow) -->
+<line x1="450" y1="656" x2="450" y2="683" stroke="#e3b341" stroke-width="1.5" marker-end="url(#arr-yellow)"/>
+<text x="462" y="673" font-size="11" fill="#e3b341">Yes</text>
 
-  <!-- ── Final Response ── -->
-  <rect x="275" y="760" width="350" height="60" rx="8" fill="#1a7f37" stroke="#3fb950" stroke-width="1.5"/>
-  <text x="450" y="786" text-anchor="middle" font-size="13" font-weight="bold" fill="#ffffff">Final Response</text>
-  <text x="450" y="806" text-anchor="middle" font-size="11" fill="#aff5b4">1–2 sentence summary streamed to user</text>
+<!-- ═══ Final Response ═══ -->
+<rect x="300" y="686" width="300" height="52" rx="8" fill="#1a7f37" stroke="#3fb950" stroke-width="1.5"/>
+<text x="450" y="708" text-anchor="middle" font-size="13" font-weight="bold" fill="#ffffff">Final Response</text>
+<text x="450" y="726" text-anchor="middle" font-size="11" fill="#aff5b4">1–2 sentence summary streamed to user</text>
 
-  <!-- ── also: task complete path from LLM directly ── -->
-  <line x1="600" y1="270" x2="700" y2="270" stroke="#8b949e" stroke-width="1" stroke-dasharray="4,3"/>
-  <line x1="700" y1="270" x2="700" y2="790" stroke="#8b949e" stroke-width="1" stroke-dasharray="4,3"/>
-  <line x1="700" y1="790" x2="625" y2="790" stroke="#8b949e" stroke-width="1" stroke-dasharray="4,3" marker-end="url(#arr)"/>
-  <text x="715" y="540" text-anchor="middle" font-size="10" fill="#8b949e" transform="rotate(90 715 540)">Task complete (no tool needed)</text>
-
-  <!-- ── Legend ── -->
-  <rect x="20" y="860" width="860" height="140" rx="8" fill="#161b22" stroke="#30363d" stroke-width="1"/>
-  <text x="450" y="883" text-anchor="middle" font-size="12" font-weight="bold" fill="#e6edf3">Legend</text>
-
-  <rect x="40"  y="896" width="14" height="14" rx="2" fill="#f0883e"/>
-  <text x="62"  y="908" font-size="11" fill="#8b949e">RAG / Docs search</text>
-
-  <rect x="200" y="896" width="14" height="14" rx="2" fill="#3fb950"/>
-  <text x="222" y="908" font-size="11" fill="#8b949e">cpptraj execution</text>
-
-  <rect x="360" y="896" width="14" height="14" rx="2" fill="#58a6ff"/>
-  <text x="382" y="908" font-size="11" fill="#8b949e">Python execution</text>
-
-  <rect x="510" y="896" width="14" height="14" rx="2" fill="#bc8cff"/>
-  <text x="532" y="908" font-size="11" fill="#8b949e">File read</text>
-
-  <rect x="630" y="896" width="14" height="14" rx="2" fill="#f85149"/>
-  <text x="652" y="908" font-size="11" fill="#8b949e">File listing</text>
-
-  <line x1="40"  y1="932" x2="70"  y2="932" stroke="#3fb950" stroke-width="1.5"/>
-  <text x="78"  y="936" font-size="11" fill="#8b949e">Loop back (continue)</text>
-
-  <line x1="230" y1="932" x2="260" y2="932" stroke="#8b949e" stroke-width="1.5" stroke-dasharray="4,3"/>
-  <text x="268" y="936" font-size="11" fill="#8b949e">Direct completion (no tool needed)</text>
-
-  <text x="450" y="970" text-anchor="middle" font-size="10" fill="#484f58">Each run_cpptraj_script is a fresh process — intermediate results must be written to disk and reloaded via readdata</text>
-
-  <!-- Arrowhead marker -->
-  <defs>
-    <marker id="arr" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
-      <path d="M0,0 L0,6 L8,3 z" fill="#8b949e"/>
-    </marker>
-  </defs>
+<!-- ═══ Legend ═══ -->
+<rect x="20" y="758" width="860" height="82" rx="8" fill="#161b22" stroke="#30363d" stroke-width="1"/>
+<text x="450" y="778" text-anchor="middle" font-size="12" font-weight="bold" fill="#e6edf3">Legend</text>
+<rect x="38"  y="789" width="12" height="12" rx="2" fill="#f0883e"/>
+<text x="56"  y="800" font-size="10" fill="#8b949e">RAG / Docs search</text>
+<rect x="175" y="789" width="12" height="12" rx="2" fill="#3fb950"/>
+<text x="193" y="800" font-size="10" fill="#8b949e">cpptraj execution</text>
+<rect x="310" y="789" width="12" height="12" rx="2" fill="#58a6ff"/>
+<text x="328" y="800" font-size="10" fill="#8b949e">Python execution</text>
+<rect x="445" y="789" width="12" height="12" rx="2" fill="#bc8cff"/>
+<text x="463" y="800" font-size="10" fill="#8b949e">File read</text>
+<rect x="540" y="789" width="12" height="12" rx="2" fill="#f85149"/>
+<text x="558" y="800" font-size="10" fill="#8b949e">File listing</text>
+<line x1="640" y1="795" x2="665" y2="795" stroke="#3fb950" stroke-width="1.5"/>
+<text x="672" y="800" font-size="10" fill="#8b949e">Loop back (No)</text>
+<line x1="760" y1="795" x2="785" y2="795" stroke="#e3b341" stroke-width="1.5"/>
+<text x="792" y="800" font-size="10" fill="#8b949e">Final (Yes)</text>
+<text x="450" y="830" text-anchor="middle" font-size="10" fill="#484f58">Each run_cpptraj_script is a fresh process — write intermediates to disk, reload via readdata</text>
 
 </svg>
