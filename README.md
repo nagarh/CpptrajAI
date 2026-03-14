@@ -41,8 +41,9 @@ An AI-powered IDE for molecular dynamics (MD) trajectory analysis using **cpptra
 | Feature | Description |
 |---------|-------------|
 | **AI Agent** | Natural-language prompt → cpptraj script → execution → result interpretation |
-| **RAG over cpptraj manual** | TF-IDF retrieval from CpptrajManual.pdf — correct commands, options, and syntax injected automatically |
-| **Multi-provider AI** | Claude (Anthropic), GPT-4o (OpenAI), Gemini (Google) — your choice |
+| **RAG over cpptraj manual** | On-demand TF-IDF retrieval from CpptrajManual.pdf — the AI searches documentation only when it needs exact syntax |
+| **Multi-provider AI** | Claude (Anthropic), GPT-4o (OpenAI), Gemini (Google), or any Ollama local model |
+| **Local model support** | Run any Ollama model (qwen3, llama3, deepseek, etc.) on your own hardware — no API key needed |
 | **Script Editor** | Write/edit cpptraj scripts manually with one-click execution |
 | **Python Editor** | Post-process output files with Python/pandas/matplotlib inline |
 | **Interactive Plots** | Plotly charts auto-generated from output `.dat` files |
@@ -102,7 +103,9 @@ Open your browser at **http://localhost:8502**
 
 ## AI Backend Setup
 
-CpptrajAI supports three cloud AI providers. Select one in the **⚙ Settings** panel.
+CpptrajAI supports cloud AI providers and local models via Ollama.
+
+### Cloud Providers
 
 | Provider | Models | Where to get key |
 |----------|--------|-----------------|
@@ -110,10 +113,29 @@ CpptrajAI supports three cloud AI providers. Select one in the **⚙ Settings** 
 | **OpenAI** | GPT-4o, GPT-4o Mini | [platform.openai.com](https://platform.openai.com) |
 | **Google (Gemini)** | Gemini 2.5 Flash | [aistudio.google.com](https://aistudio.google.com) |
 
-**How to configure:**
+### Local Models via Ollama (Free, No API Key)
+
+Run any model locally using [Ollama](https://ollama.com):
+
+```bash
+# Install Ollama, then pull a model
+ollama pull qwen3:14b
+
+# Start Ollama server
+ollama serve
+```
+
+In CpptrajAI Settings:
+- Provider → **Ollama**
+- Base URL → `http://localhost:11434/v1`
+- Model → `qwen3:14b` (or any model you pulled)
+
+> Recommended local models: `qwen3:14b`, `qwen3:32b`, `qwen3:30b-a3b` (MoE). These have strong tool-calling support essential for the agentic workflow.
+
+**How to configure any provider:**
 1. Click **⚙ Settings** (top-right of the IDE)
 2. Select your provider
-3. Paste your API key
+3. Paste your API key (not needed for Ollama)
 4. Choose a model
 5. Click **Save**
 
@@ -156,7 +178,7 @@ Before running any analysis, upload your MD files using the **right panel**:
 Once uploaded, the IDE displays:
 - Topology filename
 - Total atoms, residues
-- Protein residues, ligand residues
+- Protein residues, ligand residues (auto-detected)
 - Trajectory file(s) loaded
 
 > **Test data:** Click **Load Test Data** to load the built-in sample topology and trajectory to try the app without your own files.
@@ -181,22 +203,22 @@ The AI Chat tab is the primary interface. Type your analysis request in plain En
 Calculate RMSD of protein backbone over all frames
 ```
 ```
-Plot radius of gyration of the ligand in residue 203
+Plot radius of gyration of the ligand
 ```
 ```
-Run RMSD and RMSF for residues 1-100, save plots
+Calculate the dynamic cross-correlation matrix of the Cα atoms and plot it as a heatmap
 ```
 ```
 Cluster the trajectory into 5 clusters using hierarchical clustering
 ```
 ```
-Perform PCA on the Cα atoms and project the trajectory
+Perform PCA on the protein backbone and plot the first two principal components colored by time
 ```
 ```
-Calculate hydrogen bonds between protein and ligand
+Calculate hydrogen bonds between protein and ligand and plot their occupancy
 ```
 ```
-What is the average SASA of the protein?
+Calculate RMSD and radius of gyration, then plot a 2D free energy landscape
 ```
 ```
 Strip water molecules and save a new trajectory
@@ -204,13 +226,12 @@ Strip water molecules and save a new trajectory
 
 ### How it works
 
-1. Your prompt is enriched with:
-   - File context (topology name, atom/residue counts, trajectory files)
-   - Relevant cpptraj documentation retrieved from the manual (TF-IDF RAG)
-2. The AI writes a cpptraj script using the correct commands and syntax
-3. The script is executed automatically via the `run_cpptraj_script` tool
-4. Output files are read back and the AI summarizes the results
-5. Plots are generated automatically for `.dat` output files
+1. Your prompt is enriched with file context (topology name, atom/residue counts, ligand info)
+2. The AI calls `search_cpptraj_docs` when it needs exact command syntax from the manual
+3. The AI writes a cpptraj script using verified commands and syntax
+4. The script is executed automatically
+5. Output files are read back and the AI summarizes key results
+6. Plots are generated automatically for `.dat` output files
 
 ### Stop a running analysis
 
@@ -242,8 +263,10 @@ The **Script** tab lets you write cpptraj scripts manually.
 ```
 parm protein.prmtop
 trajin mdin_prod.nc
-rmsd backbone :1-200@CA out rmsd_backbone.dat
-radgyr LigRg :203 out ligand_rg.dat mass
+strip :WAT
+autoimage
+rmsd backbone :1-200@CA,C,N,O first out rmsd_backbone.dat
+radgyr :203 out ligand_rg.dat mass
 go
 ```
 
@@ -254,8 +277,8 @@ go
 The **Python** tab provides an inline Python environment for post-processing output files.
 
 - Output files from cpptraj are available in the working directory
-- Use `pandas`, `numpy`, `matplotlib` to process and plot results
-- Results print to the output panel
+- Use `pandas`, `numpy`, `matplotlib`, `scipy`, `scikit-learn` to process and plot results
+- Results and plots appear in the output panel
 
 ### Example
 
@@ -299,14 +322,15 @@ CpptrajAI supports all cpptraj analyses. Common categories:
 | Category | Examples |
 |----------|---------|
 | **Structural metrics** | RMSD, RMSF, radius of gyration, distance, angle, dihedral |
+| **Correlation analysis** | Dynamic cross-correlation matrix (DCCM), pairwise distance matrix |
 | **Solvent / surface** | SASA, water shell analysis, volumetric density |
 | **Dynamics** | Atomic fluctuations, diffusion/MSD, B-factors |
 | **Clustering** | Hierarchical, K-means, DBSCAN |
-| **Dimensionality reduction** | PCA (covariance matrix + projection) |
+| **Dimensionality reduction** | PCA (covariance matrix → diagonalization → projection) |
 | **Interactions** | Hydrogen bonds, native contacts (Q-value), salt bridges |
 | **Secondary structure** | DSSP per-residue per-frame |
 | **Trajectory manipulation** | Strip atoms/solvent, imaging, centering, autoimage |
-| **Free energy** | 2D RMSD matrix, dihedral entropy |
+| **Free energy** | 2D PMF landscape, dihedral entropy |
 | **NMR/crystallography** | Order parameters, residual dipolar couplings |
 
 ---
@@ -328,9 +352,9 @@ CpptrajAI/
 ├── server.py               # Flask backend — REST API + SSE streaming
 ├── agent_ide.html          # Single-page frontend — HTML/CSS/JS
 ├── core/
-│   ├── agent.py            # AI agent: tool calling, history, RAG injection
+│   ├── agent.py            # AI agent: tool calling, conversation history, RAG
 │   ├── knowledge_base.py   # cpptraj manual RAG (TF-IDF) + command registry
-│   ├── llm_backends.py     # Claude / OpenAI / Gemini backends
+│   ├── llm_backends.py     # Claude / OpenAI / Gemini / Ollama backends
 │   └── runner.py           # cpptraj subprocess execution + file management
 ├── CpptrajManual.pdf       # Source PDF for RAG
 ├── cpptraj_manual_cache.json  # Pre-parsed PDF chunks (213 chunks)
@@ -341,11 +365,11 @@ CpptrajAI/
 
 ### RAG pipeline
 
-1. `CpptrajManual.pdf` is parsed into 213 chunks (cached to JSON)
-2. A TF-IDF index is built over all chunks at startup
-3. On each user message, the top-3 most relevant chunks are retrieved
-4. Chunks scoring above a threshold (0.10 cosine similarity) are injected into the prompt
-5. The compact command cheatsheet (all commands + syntax) is always in the system prompt
+1. `CpptrajManual.pdf` is parsed into 213 chunks at startup (cached to JSON)
+2. A TF-IDF index is built over all chunks
+3. The AI agent has a `search_cpptraj_docs` tool it calls on demand when it needs exact command syntax
+4. The top-2 most relevant manual chunks are returned to the model
+5. Cloud models (Claude, GPT-4o, Gemini) call the tool only when uncertain — local models call it before every script for reliability
 6. The AI writes scripts using exact command names from the retrieved documentation
 
 ### Multi-user isolation
@@ -356,7 +380,7 @@ Each browser session gets a unique UUID cookie. All state (uploaded files, agent
 
 ## Docker / HuggingFace Spaces
 
-CpptrajAI is deployed as a Docker app on HuggingFace Spaces.
+CpptrajAI is deployable as a Docker app on HuggingFace Spaces.
 
 ### Build and run locally with Docker
 
@@ -384,12 +408,12 @@ Open **http://localhost:7860**
 - Or set `export CPPTRAJ_PATH=/full/path/to/cpptraj`
 
 ### AI agent writes wrong command names
-- This is prevented by the RAG system — the AI receives exact syntax from the manual
-- If it still happens, try a more specific prompt: *"use the radgyr command to calculate radius of gyration"*
+- The RAG system provides exact syntax from the manual on demand
+- If it still happens, be more specific: *"calculate radius of gyration"* instead of *"calculate Rg"*
 
 ### Script runs but no output files appear
-- Check that your script includes analysis commands that write output (e.g., `out rmsd.dat`)
-- The `go` command is appended automatically, but verify the script logic is correct
+- Ensure analysis commands include an output file (`out rmsd.dat`)
+- The `go` command is appended automatically if missing
 
 ### Port 8502 already in use
 ```bash
@@ -398,10 +422,15 @@ python server.py
 ```
 
 ### Large trajectories time out
-- Default timeout is 300 seconds. For very large systems, sub-sample the trajectory:
+- Default timeout is 300 seconds. Sub-sample for very large systems:
   ```
   trajin mdin_prod.nc 1 last 10   # every 10th frame
   ```
+
+### Ollama model not responding
+- Ensure Ollama is running: `ollama serve`
+- Check the base URL in Settings matches where Ollama is running
+- Verify the model is pulled: `ollama list`
 
 ---
 
