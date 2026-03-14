@@ -284,16 +284,8 @@ CpptrajAI supports all cpptraj analyses. Common categories:
 | Category | Examples |
 |----------|---------|
 | **Structural metrics** | RMSD, RMSF, radius of gyration, distance, angle, dihedral |
-| **Correlation analysis** | Dynamic cross-correlation matrix (DCCM), pairwise distance matrix |
-| **Solvent / surface** | SASA, water shell analysis, volumetric density |
-| **Dynamics** | Atomic fluctuations, diffusion/MSD, B-factors |
-| **Clustering** | Hierarchical, K-means, DBSCAN |
-| **Dimensionality reduction** | PCA (covariance matrix → diagonalization → projection) |
-| **Interactions** | Hydrogen bonds, native contacts (Q-value), salt bridges |
-| **Secondary structure** | DSSP per-residue per-frame |
+| **Correlation analysis** | Dynamic cross-correlation matrix (DCCM), pairwise Cα distance matrix |
 | **Trajectory manipulation** | Strip atoms/solvent, imaging, centering, autoimage |
-| **Free energy** | 2D PMF landscape, dihedral entropy |
-| **NMR/crystallography** | Order parameters, residual dipolar couplings |
 
 ---
 
@@ -324,6 +316,18 @@ CpptrajAI/
 ├── Dockerfile              # For HuggingFace Spaces deployment
 └── requirements.txt
 ```
+
+### Agent tools
+
+The AI agent has access to the following tools it can call autonomously:
+
+| Tool | Description |
+|------|-------------|
+| `search_cpptraj_docs` | Search the cpptraj manual (TF-IDF RAG) for exact command names and syntax. Called on demand before writing scripts. |
+| `run_cpptraj_script` | Write and execute a cpptraj script. Returns stdout, stderr, elapsed time, and output files generated. |
+| `run_python_script` | Write and execute a Python script for post-processing, plotting, or statistics on cpptraj output files. |
+| `read_output_file` | Read the content of an output file produced by a previous cpptraj run. |
+| `list_output_files` | List all output files currently in the working directory. |
 
 ### RAG pipeline
 
