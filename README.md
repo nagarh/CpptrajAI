@@ -343,62 +343,7 @@ This section explains exactly how CpptrajAI processes a user prompt from start t
 
 ### Execution flow
 
-```mermaid
-flowchart TD
-    A([🧑 User Prompt]) --> B
-
-    B["⚙️ System Prompt Injection
-    ────────────────────────
-    • Topology info: atoms, residues, masks
-    • Uploaded file names
-    • Execution rules & workflow guidelines"]
-
-    B --> C{"🤖 LLM
-    Decides Next Action"}
-
-    C -->|needs syntax| D["🔍 search_cpptraj_docs
-    ──────────────────────
-    TF-IDF search over
-    CpptrajManual.pdf
-    Returns top-2 chunks"]
-
-    C -->|run analysis| E["⚗️ run_cpptraj_script
-    ──────────────────────
-    Writes & executes
-    cpptraj subprocess
-    Returns stdout + files"]
-
-    C -->|post-process / plot| F["🐍 run_python_script
-    ──────────────────────
-    Executes Python
-    pandas / numpy / scipy
-    Returns output + plots"]
-
-    C -->|inspect results| G["📄 read_output_file
-    ──────────────────────
-    Reads .dat or any
-    output file from disk"]
-
-    C -->|check files| H["📂 list_output_files
-    ──────────────────────
-    Lists all files in
-    session working dir"]
-
-    D -->|chunks returned| I["📋 Tool Result
-    appended to conversation"]
-    E -->|stdout + file list| I
-    F -->|output + plots| I
-    G -->|file content| I
-    H -->|file list| I
-
-    I --> J{Max 15 iterations
-    reached?}
-    J -->|no| C
-    J -->|yes| K
-
-    C -->|task complete| K([✅ Final 1-2 sentence
-    summary to user])
-```
+![Agent Execution Flow](agent_flow.svg)
 
 ### Agent tools
 
