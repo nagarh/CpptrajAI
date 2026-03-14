@@ -1223,6 +1223,19 @@ const COMMANDS = [
 let currentFilter = 'all';
 let currentSearch = '';
 let selectedCmd   = null;
+// ── Session ID (bypasses cookie issues behind HF proxy/iframe) ──────────────
+const _SID = (() => {
+  let sid = sessionStorage.getItem('cpptraj_sid');
+  if (!sid) { sid = crypto.randomUUID(); sessionStorage.setItem('cpptraj_sid', sid); }
+  return sid;
+})();
+
+// Wrap fetch to always send X-Session-Id header
+const _fetch = (url, opts = {}) => {
+  opts.headers = { ...(opts.headers || {}), 'X-Session-Id': _SID };
+  return fetch(url, opts);
+};
+
 let uploadedFiles = [];
 let rightMode     = 'files';
 let selectedOutfile = null;
@@ -1399,7 +1412,7 @@ async function runPython() {
   pyTermLog('$ python script.py', 't-prompt');
 
   try {
-    const r    = await fetch('/api/run_python', {
+    const r    = await _fetch('/api/run_python', {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({script}),
@@ -1469,7 +1482,7 @@ async function handleFiles(files) {
     try {
       const fd = new FormData();
       fd.append('file', f);
-      const r    = await fetch('/api/upload', { method:'POST', body:fd });
+      const r    = await _fetch('/api/upload', { method:'POST', body:fd });
       const data = await r.json();
       if (data.error) { termLog(`[upload] Error: ${data.error}`, 't-error'); continue; }
       uploadedFiles.push({ name:f.name, size:f.size, kind:data.kind, ext:data.ext });
@@ -1551,7 +1564,7 @@ async function runAnalysis() {
   document.getElementById('progressFill').style.width = '40%';
 
   try {
-    const resp = await fetch('/api/run', {
+    const resp = await _fetch('/api/run', {
       method:  'POST',
       headers: {'Content-Type':'application/json'},
       body:    JSON.stringify({ script }),
@@ -1637,7 +1650,7 @@ function setCenterTab(tab, el) {
 // ─────────────────────────────────────────────────────────────────────────────
 async function refreshOutputFiles() {
   try {
-    const r     = await fetch('/api/files');
+    const r     = await _fetch('/api/files');
     const files = await r.json();
     const list  = document.getElementById('outfilesList');
 
@@ -1687,7 +1700,7 @@ async function viewOutputFile(name) {
     };
   } else {
     try {
-      const r    = await fetch(`/api/file/${encodeURIComponent(name)}`);
+      const r    = await _fetch(`/api/file/${encodeURIComponent(name)}`);
       const blob = await r.blob();
       const blobUrl = URL.createObjectURL(blob);
       // Show text preview
@@ -1944,7 +1957,7 @@ async function sendChatMsg(msg) {
   let ranScript   = false;
 
   try {
-    const r = await fetch('/api/chat/stream', {
+    const r = await _fetch('/api/chat/stream', {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({message: msg}),
@@ -2063,7 +2076,7 @@ async function sendChatMsg(msg) {
 }
 
 async function stopChat() {
-  try { await fetch('/api/chat/stop', {method:'POST'}); } catch {}
+  try { await _fetch('/api/chat/stop', {method:'POST'}); } catch {}
 
   // Immediately hide all thinking dots without waiting for SSE stopped event
   document.querySelectorAll('[id^="think_"]').forEach(el => { el.style.display = 'none'; });
@@ -2076,7 +2089,7 @@ async function stopChat() {
 }
 
 async function resetChat() {
-  try { await fetch('/api/chat/reset', {method:'POST'}); } catch {}
+  try { await _fetch('/api/chat/reset', {method:'POST'}); } catch {}
   document.getElementById('chatMessages').innerHTML = `
     <div class="no-select" style="padding:30px 10px">
       <div class="big">⚡</div>
@@ -2086,7 +2099,7 @@ async function resetChat() {
 
 async function resetAll() {
   if (!confirm('Reset everything? This will clear chat, uploaded files, and all output files.')) return;
-  try { await fetch('/api/reset_all', {method:'POST'}); } catch {}
+  try { await _fetch('/api/reset_all', {method:'POST'}); } catch {}
 
   // Clear chat
   document.getElementById('chatMessages').innerHTML = `
@@ -2178,7 +2191,7 @@ async function saveSettings() {
     ? (document.getElementById('ollamaUrlInput').value.trim() || 'http://localhost:11434/v1')
     : '';
   try {
-    const r = await fetch('/api/set_provider', {
+    const r = await _fetch('/api/set_provider', {
       method: 'POST',
       headers: {'Content-Type':'application/json'},
       body: JSON.stringify({ provider, api_key, model, base_url }),
@@ -2201,7 +2214,7 @@ document.getElementById('settingsModal').addEventListener('click', e => {
 // ─────────────────────────────────────────────────────────────────────────────
 async function refreshStatus() {
   try {
-    const r    = await fetch('/api/status');
+    const r    = await _fetch('/api/status');
     const data = await r.json();
 
     const dot = (id, on) => document.getElementById(id).className = `sdot ${on ? 'on' : 'off'}`;
@@ -2336,7 +2349,7 @@ document.getElementById('templatesModal').addEventListener('click', e => {
 async function loadTestFile(filename) {
   termLog(`[test] Loading ${filename} from server…`, 't-info');
   try {
-    const r    = await fetch(`/api/test/${encodeURIComponent(filename)}`);
+    const r    = await _fetch(`/api/test/${encodeURIComponent(filename)}`);
     const blob = await r.blob();
     const file = new File([blob], filename);
     await handleFiles([file]);
@@ -2442,18 +2455,18 @@ async function loadIntoViewer() {
     const pdbTraj = uploadedFiles.find(f => f.name.toLowerCase().endsWith('.pdb'));
     if (pdbTraj) {
       termLog(`[viewer] Loading PDB ${pdbTraj.name}…`, 't-info');
-      pdbText = await (await fetch(`/api/file/${encodeURIComponent(pdbTraj.name)}`)).text();
+      pdbText = await (await _fetch(`/api/file/${encodeURIComponent(pdbTraj.name)}`)).text();
     } else {
       termLog('[viewer] Converting via cpptraj (stripping solvent)…', 't-info');
       const firstFrame = parseInt(document.getElementById('viewerFirstFrame').value) || 1;
       const lastFrame  = parseInt(document.getElementById('viewerLastFrame').value)  || null;
-      const r = await fetch('/api/prepare_viewer', { method: 'POST',
+      const r = await _fetch('/api/prepare_viewer', { method: 'POST',
         headers: {'Content-Type':'application/json'},
         body: JSON.stringify({ first_frame: firstFrame, last_frame: lastFrame }) });
       const d = await r.json();
       if (!r.ok || !d.ok) { termLog(`[viewer] Conversion failed: ${d.error}`, 't-error'); return; }
       termLog(`[viewer] Done — ${d.frames} frames, loading…`, 't-success');
-      pdbText = await (await fetch(`/api/file/${encodeURIComponent(d.filename)}`)).text();
+      pdbText = await (await _fetch(`/api/file/${encodeURIComponent(d.filename)}`)).text();
     }
 
     _init3Dmol();

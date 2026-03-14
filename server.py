@@ -99,12 +99,14 @@ def _cleanup_expired_sessions():
 
 
 def get_sd() -> dict:
-    """Get or create per-session state dict."""
-    # Lazy cleanup (cheap check)
+    """Get or create per-session state dict.
+    Session ID is read from X-Session-Id header (set by the frontend),
+    falling back to Flask cookie session for backwards compatibility.
+    """
     if len(_SESSIONS) > 50:
         _cleanup_expired_sessions()
 
-    sid = session.get("sid")
+    sid = request.headers.get("X-Session-Id") or session.get("sid")
     if not sid or sid not in _SESSIONS:
         sid = str(uuid.uuid4())
         session["sid"] = sid
