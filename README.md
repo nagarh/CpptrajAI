@@ -130,6 +130,17 @@ In CpptrajAI Settings:
 
 > Recommended local models: `qwen3:14b`, `qwen3:32b`, `qwen3:30b-a3b` (MoE). These have strong tool-calling support essential for the agentic workflow.
 
+### Model Recommendations
+
+| Model | Best for | Notes |
+|-------|----------|-------|
+| **Claude Sonnet 4.6** | Complex multi-step analyses — PCA, DCCM, 2D PMF, free energy landscapes | Most reliable for chained tool calls and multi-script workflows. Recommended for production use. |
+| **GPT-4o** | Moderate complexity — RMSD, RMSF, Rg, clustering, hydrogen bonds | Reliable and accurate. Watch rate limits (TPM) on long sessions. |
+| **Gemini 2.5 Flash** | Light to moderate analyses | Fast and cost-effective for routine tasks. |
+| **Qwen3:14b / 32b (Ollama)** | Simple to moderate analyses — RMSD, Rg, strip/image, distance | Free and runs locally. Handles common analyses well but can hallucinate on complex multi-step workflows. Use `qwen3:32b` for best local results. |
+
+> **Recommendation:** Use Claude Sonnet 4.6 for anything involving PCA, correlation matrices, or free energy. Use Qwen3 locally for quick exploratory analyses.
+
 **How to configure any provider:**
 1. Click **⚙ Settings** (top-right of the IDE)
 2. Select your provider
@@ -183,6 +194,9 @@ Calculate the dynamic cross-correlation matrix of the Cα atoms and plot it as a
 ```
 ```
 Strip water molecules and save a new trajectory
+```
+```
+Calculate the radius of gyration of the protein and plot a 2D free energy landscape (PMF) as a function of RMSD vs Rg
 ```
 
 ### How it works
@@ -284,7 +298,14 @@ CpptrajAI supports all cpptraj analyses. Common categories:
 |----------|---------|
 | **Structural metrics** | RMSD, RMSF, radius of gyration, distance, angle, dihedral |
 | **Correlation analysis** | Dynamic cross-correlation matrix (DCCM), pairwise Cα distance matrix |
+| **Solvent / surface** | SASA, water shell analysis, volumetric density |
+| **Dynamics** | Atomic fluctuations, diffusion/MSD, B-factors |
+| **Clustering** | Hierarchical, K-means, DBSCAN |
+| **Dimensionality reduction** | PCA (covariance matrix → diagonalization → projection) |
+| **Interactions** | Hydrogen bonds, native contacts (Q-value), salt bridges |
+| **Secondary structure** | DSSP per-residue per-frame |
 | **Trajectory manipulation** | Strip atoms/solvent, imaging, centering, autoimage |
+| **Free energy** | 2D PMF landscape, dihedral entropy |
 
 ---
 
@@ -358,31 +379,12 @@ Each browser session gets a unique UUID cookie. All state (uploaded files, agent
 
 ## Docker
 
-### Option 1 — Pull from Docker Hub (easiest)
-
 ```bash
 docker pull nagarh/cpptraj-ai:latest
 docker run -p 8502:8502 nagarh/cpptraj-ai:latest
 ```
 
 Open **http://localhost:8502**
-
-### Option 2 — Docker Compose
-
-```bash
-docker compose up
-```
-
-Open **http://localhost:8502**
-
-### Option 3 — Build from source
-
-```bash
-git clone https://github.com/nagarh/CpptrajAI.git
-cd CpptrajAI
-docker build -t cpptraj-ai .
-docker run -p 8502:8502 cpptraj-ai
-```
 
 ### Environment variables
 
