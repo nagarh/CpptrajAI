@@ -15,6 +15,8 @@ An AI-powered IDE for molecular dynamics (MD) trajectory analysis using **cpptra
 
 > **Type a prompt like "Calculate RMSD of the protein backbone" — CpptrajAI writes the cpptraj script, runs it, and reports the results.**
 
+🌐 **Live demo:** [huggingface.co/spaces/hemantn/CpptrajAI](https://huggingface.co/spaces/hemantn/CpptrajAI)
+
 ---
 
 ## Table of Contents
